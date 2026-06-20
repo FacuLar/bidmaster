@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno / secretos
+.env
+.env.local
+*.env.local
+
+# Base de datos (se regenera con: npm run seed)
+*.sqlite
+
+# Logs
+*.log
+npm-debug.*
+install.log
+
+# Expo / builds
+.expo/
+dist/
+web-build/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Config local de Claude (personal, no compartir)
+.claude/settings.local.json
+
+# Temporales
+/tmp/

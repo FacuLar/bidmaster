@@ -1,0 +1,115 @@
+const { Subasta, Pieza, MedioPago, Usuario } = require('../models');
+const { AppError, asyncHandler } = require('../middleware/errorHandler');
+const { puedeAcceder } = require('../services/categoriaService');
+const { subastaComprometida } = require('../services/pujaService');
+
+/* 3.1 Listar Subastas Activas (Home) — GET /subastas?moneda=&categoria= */
+const listarSubastas = asyncHandler(async (req, res) => {
+  const where = { estado: 'activa' };
+  if (req.query.moneda) where.moneda = req.query.moneda; // ARS / USD
+
+  const subastas = await Subasta.findAll({
+    where,
+    include: [{ model: Pieza, as: 'piezas' }],
+    order: [['fecha', 'ASC']],
+  });
+
+  const data = subastas.map((s) => ({
+    id_subasta: s.id,
+    titulo: s.titulo,
+    fecha: s.fecha,
+    hora: s.hora,
+    moneda: s.moneda,
+    rematador: s.rematador,
+    categoria_requerida: s.categoria_requerida,
+    ubicacion: s.ubicacion,
+    cantidad_piezas: s.piezas ? s.piezas.length : 0,
+    // El usuario logueado sabe si puede o no acceder.
+    accesible: req.usuario ? puedeAcceder(req.usuario.categoria, s.categoria_requerida) : null,
+  }));
+
+  res.status(200).json(data);
+});
+
+/* 3.2 Detalle de Piezas (Catálogo) — GET /subastas/:id/catalogo
+   Oculta el precio base si el usuario no está logueado. */
+const catalogo = asyncHandler(async (req, res) => {
+  const subasta = await Subasta.findByPk(req.params.id, {
+    include: [{ model: Pieza, as: 'piezas' }],
+  });
+  if (!subasta) throw new AppError('Subasta inexistente', 404);
+
+  const logueado = !!req.usuario;
+  const piezas = subasta.piezas.map((p) => ({
+    id_pieza: p.id,
+    nro_pieza: p.nro_pieza,
+    titulo: p.titulo,
+    descripcion: p.descripcion,
+    artista: p.artista,
+    fecha_obra: p.fecha_obra,
+    historia: p.historia,
+    imagenes: p.imagenes,
+    oferta_actual: p.oferta_actual,
+    estado: p.estado,
+    // Sólo los usuarios registrados ven el precio base.
+    precio_base: logueado ? p.precio_base : null,
+  }));
+
+  res.status(200).json({
+    id_subasta: subasta.id,
+    titulo: subasta.titulo,
+    moneda: subasta.moneda,
+    categoria_requerida: subasta.categoria_requerida,
+    rematador: subasta.rematador,
+    piezas,
+  });
+});
+
+/* 3.3 Conectar a Streaming — GET /subastas/:id/streaming
+   Valida categoría + medio verificado + que no esté en otra sala. */
+const streaming = asyncHandler(async (req, res) => {
+  const subasta = await Subasta.findByPk(req.params.id);
+  if (!subasta) throw new AppError('Subasta inexistente', 404);
+
+  // Cuenta suspendida (multa impaga): no accede a los servicios.
+  if (req.usuario.estado === 'suspendido') {
+    throw new AppError('Cuenta suspendida por multa impaga: regularizá para acceder', 403);
+  }
+
+  if (!puedeAcceder(req.usuario.categoria, subasta.categoria_requerida)) {
+    throw new AppError('Categoría insuficiente para esta subasta', 403);
+  }
+
+  const medioVerificado = await MedioPago.findOne({
+    where: { usuario_id: req.usuario.id, estado_verificacion: 'Verificado', moneda: subasta.moneda },
+  });
+  if (!medioVerificado) {
+    throw new AppError(`Necesitás un medio de pago verificado en ${subasta.moneda}`, 403);
+  }
+
+  // COMPROMISO: si el usuario ya pujó en otra subasta que sigue activa, queda
+  // atado a esa hasta que termine; las demás le quedan bloqueadas.
+  const comprometida = await subastaComprometida(req.usuario.id);
+  if (comprometida && String(comprometida) !== String(subasta.id)) {
+    throw new AppError(
+      `Estás participando en la subasta #${comprometida} hasta que termine. Las demás quedan bloqueadas.`,
+      403,
+    );
+  }
+
+  const base = process.env.STREAM_BASE_URL || 'wss://stream.bidmaster.com';
+  res.status(200).json({
+    url_stream: `${base}/${subasta.id}`,
+    // Medio de pago que se usará en esta subasta (se define al iniciar).
+    medio_pago: {
+      id: medioVerificado.id,
+      tipo: medioVerificado.tipo,
+      entidad: medioVerificado.entidad,
+      numero: medioVerificado.numero_identificador,
+      moneda: medioVerificado.moneda,
+      saldo_disponible: medioVerificado.saldo_disponible,
+    },
+  });
+});
+
+module.exports = { listarSubastas, catalogo, streaming };
