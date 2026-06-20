@@ -34,39 +34,64 @@ export default function LoginScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.header}>
-        <Text style={styles.martillo}>🔨</Text>
+        <View style={styles.logoBadge}>
+          <Text style={styles.martillo}>🔨</Text>
+        </View>
         <Text style={styles.logo}>BIDMASTER</Text>
+        <Text style={styles.tagline}>Subastas premium, en vivo</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.titulo}>Iniciar Sesión</Text>
+        <Text style={styles.titulo}>Iniciar sesión</Text>
+        <Text style={styles.subtitulo}>Ingresá para participar de las subastas</Text>
+
         <Campo label="Email" autoCapitalize="none" keyboardType="email-address"
           value={email} onChangeText={setEmail} placeholder="tu@email.com" />
         <Campo label="Contraseña" secureTextEntry value={password}
           onChangeText={setPassword} placeholder="••••••" />
 
-        <Boton title="INGRESAR" onPress={ingresar} loading={cargando} />
+        <Boton title="INGRESAR" size="lg" onPress={ingresar} loading={cargando} />
 
         {/* CORRECCIÓN DE DISEÑO: "¿Se me olvidó la contraseña?" */}
         <TouchableOpacity onPress={() => navigation.navigate('RecuperarPassword')}>
-          <Text style={styles.olvido}>¿Se me olvidó la contraseña?</Text>
+          <Text style={styles.olvido}>¿Olvidaste tu contraseña?</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Registro')}>
-          <Text style={styles.registro}>Registrarse</Text>
-        </TouchableOpacity>
+        <View style={styles.sep}>
+          <View style={styles.sepLinea} />
+          <Text style={styles.sepTxt}>¿No tenés cuenta?</Text>
+          <View style={styles.sepLinea} />
+        </View>
+
+        <Boton title="CREAR CUENTA" variant="outline" onPress={() => navigation.navigate('Registro')} />
       </View>
+
+      <Text style={styles.pie}>BidMaster · TPO Desarrollo de Aplicaciones 1</Text>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.azulMarino, justifyContent: 'center', padding: 22 },
-  header: { alignItems: 'center', marginBottom: 24 },
-  martillo: { fontSize: 60, color: colors.dorado },
-  logo: { color: colors.blanco, fontSize: 24, fontWeight: '800', letterSpacing: 2 },
-  card: { backgroundColor: colors.blanco, borderRadius: 16, padding: 22 },
-  titulo: { fontSize: 20, fontWeight: '800', color: colors.dorado, textAlign: 'center', marginBottom: 18 },
+  header: { alignItems: 'center', marginBottom: 26 },
+  logoBadge: {
+    width: 92, height: 92, borderRadius: 46, backgroundColor: colors.azulClaro,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+    borderWidth: 2, borderColor: colors.dorado,
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8,
+  },
+  martillo: { fontSize: 46 },
+  logo: { color: colors.blanco, fontSize: 26, fontWeight: '900', letterSpacing: 3 },
+  tagline: { color: colors.dorado, fontSize: 12.5, fontWeight: '600', marginTop: 5, letterSpacing: 0.5 },
+  card: {
+    backgroundColor: colors.blanco, borderRadius: 20, padding: 24,
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10,
+  },
+  titulo: { fontSize: 21, fontWeight: '800', color: colors.azulMarino, textAlign: 'center' },
+  subtitulo: { fontSize: 13, color: colors.grisTexto, textAlign: 'center', marginTop: 4, marginBottom: 18 },
   olvido: { color: colors.naranja, textAlign: 'center', marginTop: 14, fontWeight: '600' },
-  registro: { color: colors.azulMarino, textAlign: 'center', marginTop: 16, fontWeight: '700' },
+  sep: { flexDirection: 'row', alignItems: 'center', marginTop: 18, marginBottom: 6 },
+  sepLinea: { flex: 1, height: 1, backgroundColor: colors.grisBorde },
+  sepTxt: { color: colors.grisTexto, fontSize: 12, marginHorizontal: 10, fontWeight: '600' },
+  pie: { color: '#5B7290', textAlign: 'center', fontSize: 11, marginTop: 22 },
 });

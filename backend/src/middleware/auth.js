@@ -45,6 +45,24 @@ async function optionalAuth(req, res, next) {
   next();
 }
 
+// Clave del panel de administración. Las aprobaciones (registros y medios de
+// pago) SOLO se pueden hacer enviando este header desde Postman:
+//   x-admin-key: <ADMIN_KEY>
+const ADMIN_KEY = process.env.ADMIN_KEY || 'bidmaster_admin_2026';
+
+/**
+ * Middleware de administración. Protege los endpoints de aprobación manual.
+ * No usa JWT a propósito: la verificación/aprobación se hace por fuera de la app
+ * (desde Postman) con una clave de administrador.
+ */
+function requireAdmin(req, res, next) {
+  const clave = req.headers['x-admin-key'] || req.query.admin_key;
+  if (!clave || clave !== ADMIN_KEY) {
+    return res.status(403).json({ error: 'Acceso de administrador denegado (x-admin-key inválida)' });
+  }
+  next();
+}
+
 function firmarToken(usuario) {
   return jwt.sign(
     { id_usuario: usuario.id, categoria: usuario.categoria },
@@ -53,4 +71,4 @@ function firmarToken(usuario) {
   );
 }
 
-module.exports = { requireAuth, optionalAuth, firmarToken, JWT_SECRET };
+module.exports = { requireAuth, optionalAuth, requireAdmin, firmarToken, JWT_SECRET, ADMIN_KEY };

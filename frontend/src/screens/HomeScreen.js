@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Tarjeta, Boton, Header, BannerInvitado } from '../components/ui';
+import { Tarjeta, Boton, Header, BannerInvitado, Insignia, EmptyState } from '../components/ui';
 import { SubastaAPI } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
@@ -65,19 +65,41 @@ export default function HomeScreen({ navigation }) {
   const renderItem = ({ item }) => {
     const accesible = item.subasta.accesible;
     return (
-      <Tarjeta>
-        {item.imagenes && item.imagenes[0]
-          ? <Image source={{ uri: item.imagenes[0] }} style={styles.img} />
-          : <View style={[styles.img, styles.imgPlaceholder]}><Text style={styles.imgTxt}>🖼️ Imagen del Artículo</Text></View>}
-        <Text style={styles.titulo}>{item.titulo}</Text>
-        <Text style={styles.meta}>Cat. Requerida: {capit(item.subasta.categoria_requerida)} o superior</Text>
-        <Text style={styles.meta}>Inicio: Hoy, {item.subasta.hora}hs · Rematador: {item.subasta.rematador}</Text>
-        <Text style={styles.precio}>
-          Precio Base: {item.precio_base != null
-            ? `$${item.precio_base.toLocaleString()}`
-            : '🔒 (registrate para ver)'}
-        </Text>
-        <Boton title="INGRESAR A LA SALA" onPress={() => abrirSala(item)} disabled={!accesible} />
+      <Tarjeta style={styles.card}>
+        <View style={styles.imgWrap}>
+          {item.imagenes && item.imagenes[0]
+            ? <Image source={{ uri: item.imagenes[0] }} style={styles.img} />
+            : <View style={[styles.img, styles.imgPlaceholder]}><Text style={styles.imgTxt}>🖼️ Imagen del Artículo</Text></View>}
+          <View style={styles.envivo}>
+            <View style={styles.envivoDot} />
+            <Text style={styles.envivoTxt}>EN VIVO</Text>
+          </View>
+          {!accesible && (
+            <View style={styles.lockBadge}><Text style={styles.lockTxt}>🔒 Categoría superior</Text></View>
+          )}
+        </View>
+
+        <View style={styles.cardBody}>
+          <View style={styles.tituloRow}>
+            <Text style={styles.titulo} numberOfLines={1}>{item.titulo}</Text>
+            <Insignia texto={capit(item.subasta.categoria_requerida)} color={colors.dorado} variant="soft" />
+          </View>
+          <Text style={styles.meta}>🕒 Hoy {item.subasta.hora}hs · 🎙️ {item.subasta.rematador}</Text>
+
+          <View style={styles.precioRow}>
+            <Text style={styles.precioLbl}>Precio base</Text>
+            <Text style={styles.precio}>
+              {item.precio_base != null ? `$${item.precio_base.toLocaleString()}` : '🔒 registrate para ver'}
+            </Text>
+          </View>
+
+          <Boton
+            title={accesible ? 'INGRESAR A LA SALA' : 'NO DISPONIBLE'}
+            icon={accesible ? '🚪' : undefined}
+            onPress={() => abrirSala(item)}
+            disabled={!accesible}
+          />
+        </View>
       </Tarjeta>
     );
   };
@@ -105,9 +127,12 @@ export default function HomeScreen({ navigation }) {
           data={piezas}
           keyExtractor={(it) => String(it.id_pieza)}
           renderItem={renderItem}
-          contentContainerStyle={{ padding: 14 }}
+          contentContainerStyle={{ padding: 14, paddingBottom: 24 }}
           refreshControl={<RefreshControl refreshing={cargando} onRefresh={() => cargar(moneda)} />}
-          ListEmptyComponent={!cargando && <Text style={styles.vacio}>No hay subastas activas en esta moneda.</Text>}
+          ListEmptyComponent={!cargando && (
+            <EmptyState icon="🏛️" titulo="Sin subastas activas"
+              texto={`No hay subastas en ${moneda === 'ARS' ? 'pesos' : 'dólares'} por ahora. Probá refrescando o cambiá de moneda.`} />
+          )}
         />
       </View>
     </SafeAreaView>
@@ -122,11 +147,33 @@ const styles = StyleSheet.create({
   tabTxt: { color: colors.grisTexto, fontWeight: '600' },
   tabActivo: { color: colors.azulMarino, fontWeight: '800' },
   tabLinea: { height: 3, backgroundColor: colors.naranja, width: '100%', marginTop: 6, borderRadius: 2 },
-  img: { width: '100%', height: 150, borderRadius: 10, marginBottom: 10, backgroundColor: colors.grisPerla },
+
+  card: { padding: 0, overflow: 'hidden' },
+  imgWrap: { position: 'relative' },
+  img: { width: '100%', height: 170, backgroundColor: colors.grisPerla },
   imgPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.grisBorde },
   imgTxt: { color: colors.grisTexto, fontSize: 12 },
-  titulo: { fontSize: 17, fontWeight: '800', color: colors.azulMarino },
-  meta: { color: colors.grisTexto, fontSize: 12, marginTop: 2 },
-  precio: { color: colors.verde, fontWeight: '800', marginTop: 8, marginBottom: 4 },
-  vacio: { textAlign: 'center', color: colors.grisTexto, marginTop: 40 },
+  envivo: {
+    position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(10,25,47,0.85)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
+  },
+  envivoDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.rojo, marginRight: 6 },
+  envivoTxt: { color: colors.blanco, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  lockBadge: {
+    position: 'absolute', top: 10, right: 10,
+    backgroundColor: 'rgba(17,24,39,0.82)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,
+  },
+  lockTxt: { color: colors.blanco, fontSize: 10.5, fontWeight: '700' },
+
+  cardBody: { padding: 15 },
+  tituloRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  titulo: { fontSize: 17, fontWeight: '800', color: colors.azulMarino, flex: 1, marginRight: 8 },
+  meta: { color: colors.grisTexto, fontSize: 12, marginTop: 4 },
+  precioRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.verdeSuave, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9,
+    marginTop: 12, marginBottom: 4,
+  },
+  precioLbl: { color: colors.verdeOscuro, fontSize: 12, fontWeight: '600' },
+  precio: { color: colors.verdeOscuro, fontWeight: '800', fontSize: 15 },
 });

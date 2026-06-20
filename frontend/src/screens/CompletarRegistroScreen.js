@@ -19,11 +19,9 @@ export default function CompletarRegistroScreen({ route }) {
   const [cargando, setCargando] = useState(false);
   const [estado, setEstado] = useState('pendiente'); // pendiente | aprobada | rechazada
   const [categoria, setCategoria] = useState(null);
-  const [restante, setRestante] = useState(null);
-  const [codigoMail, setCodigoMail] = useState(null);
   const timer = useRef(null);
 
-  // Consulta el estado de la verificación hasta que la empresa apruebe/rechace.
+  // Consulta el estado de la verificación hasta que un administrador apruebe/rechace.
   useEffect(() => {
     let activo = true;
     async function consultar() {
@@ -32,16 +30,11 @@ export default function CompletarRegistroScreen({ route }) {
         if (!activo) return;
         setEstado(r.estado);
         setCategoria(r.categoria_asignada);
-        setRestante(r.segundos_restantes);
-        if (r.estado === 'aprobada' && r.codigo_validacion) {
-          setCodigoMail(r.codigo_validacion);
-          setCodigo((c) => c || r.codigo_validacion); // precargado (demo, sin mail real)
-        }
         if (r.estado === 'pendiente') {
-          timer.current = setTimeout(consultar, 2000);
+          timer.current = setTimeout(consultar, 4000);
         }
       } catch (e) {
-        if (activo) timer.current = setTimeout(consultar, 3000);
+        if (activo) timer.current = setTimeout(consultar, 5000);
       }
     }
     if (id_solicitud) consultar();
@@ -93,8 +86,8 @@ export default function CompletarRegistroScreen({ route }) {
         <ActivityIndicator size="large" color={colors.naranja} />
         <Text style={styles.verificando}>Verificando tus datos…</Text>
         <Text style={styles.subtexto}>
-          La empresa está revisando tu documentación y antecedentes.
-          {restante ? ` Tiempo estimado: ~${restante}s.` : ''}
+          Estamos revisando tu documentación y antecedentes. Te vamos a enviar un
+          mail con tu código de validación cuando tu cuenta sea habilitada.
         </Text>
         <Text style={styles.subtexto}>Podés seguir mirando las subastas como invitado mientras tanto.</Text>
       </View>
@@ -106,8 +99,8 @@ export default function CompletarRegistroScreen({ route }) {
       <Tarjeta style={{ borderColor: colors.verde, borderWidth: 1, marginBottom: 16 }}>
         <Text style={styles.mailTit}>✉️ Tu cuenta fue habilitada</Text>
         <Text style={styles.mailTxt}>
-          Te enviamos un mail con tu código de validación.
-          {codigoMail ? ` (Código: ${codigoMail})` : ''}
+          Te enviamos un mail con tu código de validación. Ingresalo abajo para
+          generar tu clave personal.
         </Text>
       </Tarjeta>
 

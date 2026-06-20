@@ -123,8 +123,10 @@ export default function RegistroScreen({ navigation }) {
       <Campo label="Mail" autoCapitalize="none" keyboardType="email-address"
         value={form.email} onChangeText={set('email')} placeholder="tu@email.com" />
       <Campo label="Domicilio legal" value={form.domicilio_legal} onChangeText={set('domicilio_legal')}
-        placeholder="Calle 123, Ciudad" />
-      <Campo label="País de origen" value={form.pais_origen} onChangeText={set('pais_origen')} />
+        placeholder="Av. Corrientes 1000, Buenos Aires" />
+      <Text style={styles.hint}>Verificamos que la dirección exista de verdad (calle, número y ciudad).</Text>
+      <Campo label="País de origen" value={form.pais_origen} onChangeText={set('pais_origen')}
+        placeholder="Argentina" />
 
       <Text style={styles.label}>Foto del DNI</Text>
       <View style={styles.dniRow}>
@@ -152,4 +154,5 @@ const styles = StyleSheet.create({
   dniTextoOk: { color: colors.verde, fontWeight: '600', fontSize: 11, marginTop: 6, textAlign: 'center' },
   preview: { width: '100%', height: 64, borderRadius: 6 },
   nota: { color: colors.grisTexto, fontSize: 12, textAlign: 'center', marginVertical: 12 },
+  hint: { color: colors.grisTexto, fontSize: 11, marginTop: -8, marginBottom: 10 },
 });

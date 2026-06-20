@@ -2,51 +2,18 @@ const bcrypt = require('bcryptjs');
 const { Usuario, SolicitudRegistro } = require('../models');
 const { firmarToken } = require('../middleware/auth');
 const { AppError, asyncHandler } = require('../middleware/errorHandler');
+const {
+  emailFormatoValido, verificarEmailExiste,
+  verificarDomicilio, paisValido, nombreValido, esImagenValida,
+} = require('../utils/validaciones');
 
-// Tiempo (segundos) que "tarda" la investigación externa antes de aprobar.
-// Simula la verificación de antecedentes sin depender de Postman ni de un admin.
-const VERIFICACION_SEGUNDOS = Number(process.env.VERIFICACION_SEGUNDOS || 8);
-
-// Validaciones de forma reutilizables (también se validan en el frontend).
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const esEmailValido = (email) => typeof email === 'string' && EMAIL_RE.test(email.trim());
-const esDomicilioValido = (dir) =>
-  typeof dir === 'string' && dir.trim().length >= 5 && /\d/.test(dir);
+// Categorías válidas que el administrador puede asignar al aprobar.
+const CATEGORIAS = ['comun', 'especial', 'plata', 'oro', 'platino'];
 
 // Simula el envío de un mail (en producción saldría por un servicio de email).
 function enviarMail(destino, asunto, cuerpo) {
   // eslint-disable-next-line no-console
   console.log(`\n📧 [MAIL] Para: ${destino}\n   Asunto: ${asunto}\n   ${cuerpo}\n`);
-}
-
-/**
- * Resuelve la verificación externa de forma diferida y determinística:
- * una vez transcurridos VERIFICACION_SEGUNDOS desde la creación, la solicitud
- * pasa a 'aprobada', se le asigna una categoría, se genera el código de
- * validación y se NOTIFICA POR MAIL que la cuenta fue habilitada. No usa timers
- * (sobrevive a reinicios) y NO se aprueba al instante de registrarse.
- */
-async function resolverVerificacion(solicitud) {
-  if (solicitud.estado !== 'pendiente') return solicitud;
-  const transcurrido = (Date.now() - new Date(solicitud.createdAt).getTime()) / 1000;
-  if (transcurrido >= VERIFICACION_SEGUNDOS) {
-    solicitud.estado = 'aprobada';
-    // La investigación externa asigna la categoría (acá, 'comun' por defecto).
-    if (!solicitud.categoria_asignada) solicitud.categoria_asignada = 'comun';
-    // Código de validación de 6 dígitos que se envía por mail.
-    solicitud.codigo_validacion = String(Math.floor(100000 + Math.random() * 900000));
-    if (!solicitud.mail_habilitacion_enviado) {
-      enviarMail(
-        solicitud.email,
-        'Tu cuenta de BidMaster fue habilitada',
-        `¡Felicitaciones! Tu cuenta fue habilitada (categoría ${solicitud.categoria_asignada}). `
-        + `Ingresá a la app y generá tu clave personal con este código: ${solicitud.codigo_validacion}`,
-      );
-      solicitud.mail_habilitacion_enviado = true;
-    }
-    await solicitud.save();
-  }
-  return solicitud;
 }
 
 /* 1.0 Iniciar Sesión (Login Directo) — POST /auth/login */
@@ -76,13 +43,31 @@ const registroEtapa1 = asyncHandler(async (req, res) => {
   if (!nombre || !apellido || !email || !dni_frente || !dni_dorso || !domicilio_legal || !pais_origen) {
     throw new AppError('Faltan datos o documentos obligatorios', 400);
   }
-  // Validación de formato: email y domicilio legal.
-  if (!esEmailValido(email)) {
+  // Nombre y apellido: sólo letras (sin números ni símbolos).
+  if (!nombreValido(nombre)) throw new AppError('El nombre sólo puede contener letras', 400);
+  if (!nombreValido(apellido)) throw new AppError('El apellido sólo puede contener letras', 400);
+
+  // País de origen: debe ser un país real.
+  if (!paisValido(pais_origen)) {
+    throw new AppError('Ingresá un país de origen válido', 400);
+  }
+
+  // Fotos del DNI: deben ser imágenes reales (no texto ni archivos cualquiera).
+  if (!esImagenValida(dni_frente) || !esImagenValida(dni_dorso)) {
+    throw new AppError('Las fotos del DNI deben ser imágenes válidas (frente y dorso)', 400);
+  }
+
+  // Email: formato + existencia real (typos, descartables y registros MX).
+  if (!emailFormatoValido(email)) {
     throw new AppError('El email no tiene un formato válido', 400);
   }
-  if (!esDomicilioValido(domicilio_legal)) {
-    throw new AppError('Ingresá un domicilio legal válido (calle y número)', 400);
-  }
+  const verif = await verificarEmailExiste(email);
+  if (!verif.ok) throw new AppError(verif.motivo, 400);
+
+  // Domicilio legal: existencia real geocodificada (OpenStreetMap).
+  const verifDir = await verificarDomicilio(domicilio_legal, pais_origen);
+  if (!verifDir.ok) throw new AppError(verifDir.motivo, 400);
+
   const existe = await Usuario.findOne({ where: { email: email.trim() } });
   if (existe) throw new AppError('Ya existe un usuario con ese email', 400);
 
@@ -90,37 +75,28 @@ const registroEtapa1 = asyncHandler(async (req, res) => {
     nombre, apellido, email: email.trim(), dni_frente, dni_dorso, domicilio_legal, pais_origen,
   });
 
-  // 202: recibido para verificación externa asíncrona (NO aprobado todavía).
+  // 202: recibido para verificación externa MANUAL (NO aprobado todavía).
   res.status(202).json({
-    mensaje: 'Solicitud en proceso de verificación externa',
+    mensaje: 'Solicitud recibida. Queda en verificación hasta que sea aprobada manualmente.',
     id_solicitud: solicitud.id_solicitud,
     estado: solicitud.estado, // 'pendiente'
-    verificacion_segundos: VERIFICACION_SEGUNDOS,
   });
 });
 
 /* 1.1.b Consultar estado de la verificación — GET /auth/solicitudes/:id/estado
-   La app consulta acá hasta que la empresa apruebe (verificación externa). */
+   La app consulta acá hasta que un administrador apruebe (verificación manual). */
 const estadoSolicitud = asyncHandler(async (req, res) => {
   const solicitud = await SolicitudRegistro.findByPk(req.params.id);
   if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
-
-  await resolverVerificacion(solicitud);
-
-  const transcurrido = (Date.now() - new Date(solicitud.createdAt).getTime()) / 1000;
-  const segundos_restantes = Math.max(0, Math.ceil(VERIFICACION_SEGUNDOS - transcurrido));
 
   const aprobada = solicitud.estado === 'aprobada';
   res.status(200).json({
     id_solicitud: solicitud.id_solicitud,
     estado: solicitud.estado, // pendiente | aprobada | rechazada
     categoria_asignada: aprobada ? solicitud.categoria_asignada : null,
-    segundos_restantes,
-    // Notificación de cuenta habilitada (la app la muestra como "mail recibido").
+    // Aviso de que la cuenta fue habilitada (la app lo muestra como "mail recibido").
     mail_habilitacion: aprobada,
-    // Para la demo (sin servidor de mail real) devolvemos el código que se
-    // "envió por mail" para validar la generación de la clave.
-    codigo_validacion: aprobada ? solicitud.codigo_validacion : null,
+    // El código de validación NO se expone acá: llega por mail al aprobar.
   });
 });
 
@@ -135,13 +111,9 @@ const registroEtapa2 = asyncHandler(async (req, res) => {
   const solicitud = await SolicitudRegistro.findByPk(id_solicitud);
   if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
   if (solicitud.estado === 'rechazada') {
-    throw new AppError('Tu solicitud fue rechazada por la verificación externa', 403);
+    throw new AppError('Tu solicitud fue rechazada por la verificación', 403);
   }
-
-  // Da una última chance a que la verificación se complete antes de bloquear.
-  await resolverVerificacion(solicitud);
-
-  // Gate real: SOLO se completa el registro si la empresa ya aprobó la solicitud.
+  // Gate real: SOLO se completa el registro si ya fue aprobada manualmente.
   if (solicitud.estado !== 'aprobada') {
     throw new AppError('Tu solicitud sigue en verificación. Esperá la aprobación.', 403);
   }
@@ -176,12 +148,75 @@ const registroEtapa2 = asyncHandler(async (req, res) => {
 const recuperarPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
   if (!email) throw new AppError('El email es obligatorio', 400);
-  if (!esEmailValido(email)) throw new AppError('El email no tiene un formato válido', 400);
+  if (!emailFormatoValido(email)) throw new AppError('El email no tiene un formato válido', 400);
   // No se revela si el email existe (buena práctica de seguridad).
-  // En producción se enviaría un mail con un enlace de recuperación.
   res.status(200).json({
     mensaje: 'Si el email está registrado, te enviamos instrucciones para restablecer tu clave.',
   });
 });
 
-module.exports = { login, registroEtapa1, estadoSolicitud, registroEtapa2, recuperarPassword };
+/* ===================== ADMIN (sólo por Postman, x-admin-key) ============== */
+
+/* Listar solicitudes de registro — GET /admin/solicitudes?estado=pendiente */
+const adminListarSolicitudes = asyncHandler(async (req, res) => {
+  const where = {};
+  if (req.query.estado) where.estado = req.query.estado;
+  const solicitudes = await SolicitudRegistro.findAll({
+    where,
+    order: [['createdAt', 'DESC']],
+    attributes: { exclude: ['dni_frente', 'dni_dorso'] }, // no devolvemos las imágenes
+  });
+  res.status(200).json(solicitudes);
+});
+
+/* Aprobar / rechazar una solicitud — PATCH /admin/solicitudes/:id/resolver
+   body: { aprobar: true|false, categoria?: 'comun'|'especial'|'plata'|'oro'|'platino' }
+   Al aprobar: asigna categoría, genera el código de validación y lo "envía" por
+   mail. El código se devuelve también en esta respuesta (para el admin). */
+const adminResolverSolicitud = asyncHandler(async (req, res) => {
+  const { aprobar, categoria } = req.body;
+  const solicitud = await SolicitudRegistro.findByPk(req.params.id);
+  if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+
+  if (aprobar === false) {
+    solicitud.estado = 'rechazada';
+    await solicitud.save();
+    enviarMail(solicitud.email, 'Tu solicitud en BidMaster',
+      'Lamentablemente tu solicitud no fue aprobada por la verificación.');
+    return res.status(200).json({ id_solicitud: solicitud.id_solicitud, estado: 'rechazada' });
+  }
+
+  if (categoria && !CATEGORIAS.includes(categoria)) {
+    throw new AppError(`Categoría inválida (${CATEGORIAS.join(', ')})`, 400);
+  }
+
+  solicitud.estado = 'aprobada';
+  solicitud.categoria_asignada = categoria || solicitud.categoria_asignada || 'comun';
+  solicitud.codigo_validacion = String(Math.floor(100000 + Math.random() * 900000));
+  solicitud.mail_habilitacion_enviado = true;
+  await solicitud.save();
+
+  enviarMail(
+    solicitud.email,
+    'Tu cuenta de BidMaster fue habilitada',
+    `¡Felicitaciones! Tu cuenta fue habilitada (categoría ${solicitud.categoria_asignada}). `
+    + `Ingresá a la app y generá tu clave personal con este código: ${solicitud.codigo_validacion}`,
+  );
+
+  res.status(200).json({
+    id_solicitud: solicitud.id_solicitud,
+    estado: 'aprobada',
+    categoria_asignada: solicitud.categoria_asignada,
+    codigo_validacion: solicitud.codigo_validacion, // visible para el admin
+  });
+});
+
+module.exports = {
+  login,
+  registroEtapa1,
+  estadoSolicitud,
+  registroEtapa2,
+  recuperarPassword,
+  adminListarSolicitudes,
+  adminResolverSolicitud,
+};

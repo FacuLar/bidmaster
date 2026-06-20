@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { requireAuth, optionalAuth, requireAdmin } = require('../middleware/auth');
 const auth = require('../controllers/authController');
 const usuario = require('../controllers/usuarioController');
 const pago = require('../controllers/pagoController');
@@ -41,5 +41,14 @@ router.patch('/vendedores/articulos/:id/condiciones', requireAuth, vendedor.resp
 router.patch('/vendedores/articulos/:id/devolucion', requireAuth, vendedor.confirmarDevolucion);
 router.get('/vendedores/articulos/:id/factura-flete', requireAuth, vendedor.facturaFlete);
 router.get('/vendedores/articulos/:id/logistica', requireAuth, vendedor.logistica);
+
+/* --------------------- Administración (sólo Postman) --------------------- */
+/* Todas requieren el header  x-admin-key: <ADMIN_KEY>  (ver POSTMAN-ADMIN.md). */
+// Aprobación manual de registros.
+router.get('/admin/solicitudes', requireAdmin, auth.adminListarSolicitudes);
+router.patch('/admin/solicitudes/:id/resolver', requireAdmin, auth.adminResolverSolicitud);
+// Verificación manual de medios de pago.
+router.get('/admin/pagos/medios', requireAdmin, pago.adminListarMedios);
+router.patch('/admin/pagos/medios/:id/verificar', requireAdmin, pago.adminVerificarMedio);
 
 module.exports = router;

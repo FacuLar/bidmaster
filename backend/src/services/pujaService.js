@@ -44,6 +44,17 @@ async function validarPuja({ usuario, pieza, subasta, monto, medioPagoId }) {
     return { ok: false, status: 400, motivo: 'La pieza ya fue vendida' };
   }
 
+  // Una subasta a la vez: si ya pujó en OTRA subasta activa, queda atado a esa
+  // hasta que termine (vale tanto para el WebSocket como para el REST).
+  const comprometida = await subastaComprometida(usuario.id);
+  if (comprometida && String(comprometida) !== String(subasta.id)) {
+    return {
+      ok: false,
+      status: 403,
+      motivo: `Ya estás participando en otra subasta activa (#${comprometida}). Esperá a que termine.`,
+    };
+  }
+
   // Categoría suficiente.
   if (!puedeAcceder(usuario.categoria, subasta.categoria_requerida)) {
     return { ok: false, status: 403, motivo: 'Categoría insuficiente para esta subasta' };

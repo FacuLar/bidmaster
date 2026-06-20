@@ -5,7 +5,8 @@ export const AuthAPI = {
   login: (email, password_personal) =>
     api.post('/auth/login', { email, password_personal }).then((r) => r.data),
   registroEtapa1: (datos) =>
-    api.post('/auth/registro-etapa1', datos).then((r) => r.data),
+    // Timeout amplio: el backend verifica el email (MX) y el domicilio (geocoding).
+    api.post('/auth/registro-etapa1', datos, { timeout: 25000 }).then((r) => r.data),
   estadoSolicitud: (id) =>
     api.get(`/auth/solicitudes/${id}/estado`).then((r) => r.data),
   registroEtapa2: (id_solicitud, email, password_personal, codigo) =>

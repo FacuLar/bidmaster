@@ -12,7 +12,17 @@ const MedioPago = sequelize.define('MedioPago', {
     allowNull: false,
   },
   entidad: { type: DataTypes.STRING },
+  // Para TARJETA guarda el número enmascarado (**** 4092); para CUENTA/CHEQUE
+  // el identificador correspondiente. NUNCA se guarda el número completo ni el CVV.
   numero_identificador: { type: DataTypes.STRING },
+  // --- Datos de TARJETA ---
+  marca: { type: DataTypes.STRING },        // VISA, MASTERCARD, AMEX
+  titular: { type: DataTypes.STRING },      // nombre del titular
+  vencimiento: { type: DataTypes.STRING },  // MM/AA
+  // --- Datos de CHEQUE ---
+  numero_cheque: { type: DataTypes.STRING },
+  banco: { type: DataTypes.STRING },
+  cbu: { type: DataTypes.STRING },
   // Sólo aplica a CHEQUE: monto total garantizado.
   monto_certificado: { type: DataTypes.FLOAT, defaultValue: 0 },
   // Saldo restante del cheque a medida que se consumen compras.
