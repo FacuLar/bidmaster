@@ -58,9 +58,15 @@ export default function AppNavigator() {
   if (cargando) return null;
   const dentro = usuario || invitado; // sesión completa O invitado (no validado)
 
+  // Discriminador de sesión: al cambiar (anónimo → invitado → usuario), fuerza el
+  // re-montaje del stack para que arranque en su pantalla inicial. Esto evita
+  // quedar "atrapado" en Completar Registro después de activar la cuenta.
+  const sesionKey = usuario ? 'auth' : invitado ? 'guest' : 'anon';
+
   return (
     <NavigationContainer>
       <Stack.Navigator
+        key={sesionKey}
         screenOptions={{
           headerStyle: { backgroundColor: colors.azulMarino },
           headerTintColor: colors.blanco,

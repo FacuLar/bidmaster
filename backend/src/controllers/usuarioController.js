@@ -27,7 +27,9 @@ const metricas = asyncHandler(async (req, res) => {
   res.status(200).json({
     nombre: usuario.nombre,
     apellido: usuario.apellido,
+    email: usuario.email,
     categoria: usuario.categoria,
+    pais_origen: usuario.pais_origen,
     subastas_asistidas: subastasDistintas.size,
     subastas_ganadas,
     total_invertido,
