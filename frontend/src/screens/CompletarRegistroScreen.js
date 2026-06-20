@@ -16,6 +16,7 @@ export default function CompletarRegistroScreen({ route }) {
 
   const [password, setPassword] = useState('');
   const [codigo, setCodigo] = useState('');
+  const [codigoMail, setCodigoMail] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [estado, setEstado] = useState('pendiente'); // pendiente | aprobada | rechazada
   const [categoria, setCategoria] = useState(null);
@@ -30,6 +31,11 @@ export default function CompletarRegistroScreen({ route }) {
         if (!activo) return;
         setEstado(r.estado);
         setCategoria(r.categoria_asignada);
+        // El "mail" se simula en la app: al aprobar, mostramos y precargamos el código.
+        if (r.estado === 'aprobada' && r.codigo_validacion) {
+          setCodigoMail(r.codigo_validacion);
+          setCodigo((c) => c || String(r.codigo_validacion));
+        }
         if (r.estado === 'pendiente') {
           timer.current = setTimeout(consultar, 4000);
         }
@@ -99,9 +105,14 @@ export default function CompletarRegistroScreen({ route }) {
       <Tarjeta style={{ borderColor: colors.verde, borderWidth: 1, marginBottom: 16 }}>
         <Text style={styles.mailTit}>✉️ Tu cuenta fue habilitada</Text>
         <Text style={styles.mailTxt}>
-          Te enviamos un mail con tu código de validación. Ingresalo abajo para
-          generar tu clave personal.
+          Tu código de validación (simula el mail). Confirmalo abajo y generá tu clave personal.
         </Text>
+        {codigoMail ? (
+          <View style={styles.codigoBox}>
+            <Text style={styles.codigoLbl}>Código</Text>
+            <Text style={styles.codigoVal}>{codigoMail}</Text>
+          </View>
+        ) : null}
       </Tarjeta>
 
       <Text style={styles.ok}>Generá tu clave personal para terminar.</Text>
@@ -125,4 +136,10 @@ const styles = StyleSheet.create({
   rechazo: { color: colors.naranja, fontWeight: '700', textAlign: 'center', fontSize: 15 },
   mailTit: { color: colors.verde, fontWeight: '800', fontSize: 15, marginBottom: 4 },
   mailTxt: { color: colors.textoOscuro, fontSize: 13 },
+  codigoBox: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.verdeSuave, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginTop: 10,
+  },
+  codigoLbl: { color: colors.verdeOscuro, fontSize: 12, fontWeight: '600' },
+  codigoVal: { color: colors.verdeOscuro, fontSize: 22, fontWeight: '900', letterSpacing: 4 },
 });

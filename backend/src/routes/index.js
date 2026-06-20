@@ -14,6 +14,7 @@ router.post('/auth/login', auth.login);
 router.post('/auth/registro-etapa1', auth.registroEtapa1);
 router.get('/auth/solicitudes/:id/estado', auth.estadoSolicitud); // estado de verificación externa
 router.post('/auth/registro-etapa2', auth.registroEtapa2);
+router.post('/auth/reanudar-registro', auth.reanudarRegistro); // volver a validar por email
 router.post('/auth/recuperar-password', auth.recuperarPassword); // corrección de diseño
 router.get('/usuarios/perfil/metricas', requireAuth, usuario.metricas);
 router.get('/usuarios/multas', requireAuth, usuario.multas);

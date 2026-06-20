@@ -11,6 +11,8 @@ export const AuthAPI = {
     api.get(`/auth/solicitudes/${id}/estado`).then((r) => r.data),
   registroEtapa2: (id_solicitud, email, password_personal, codigo) =>
     api.post('/auth/registro-etapa2', { id_solicitud, email, password_personal, codigo }).then((r) => r.data),
+  reanudarRegistro: (email) =>
+    api.post('/auth/reanudar-registro', { email }).then((r) => r.data),
   recuperarPassword: (email) =>
     api.post('/auth/recuperar-password', { email }).then((r) => r.data),
 };

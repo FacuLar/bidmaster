@@ -11,6 +11,7 @@ import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegistroScreen from '../screens/RegistroScreen';
 import CompletarRegistroScreen from '../screens/CompletarRegistroScreen';
+import ValidarCuentaScreen from '../screens/ValidarCuentaScreen';
 import RecuperarPasswordScreen from '../screens/RecuperarPasswordScreen';
 
 import HomeScreen from '../screens/HomeScreen';
@@ -70,6 +71,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Registro" component={RegistroScreen} options={{ title: 'Creá tu cuenta' }} />
+            <Stack.Screen name="ValidarCuenta" component={ValidarCuentaScreen} options={{ title: 'Validar mi cuenta' }} />
             <Stack.Screen name="CompletarRegistro" component={CompletarRegistroScreen} options={{ title: 'Completar Registro' }} />
             <Stack.Screen name="RecuperarPassword" component={RecuperarPasswordScreen} options={{ title: 'Recuperar contraseña' }} />
           </>

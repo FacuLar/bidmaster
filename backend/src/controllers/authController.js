@@ -96,17 +96,23 @@ const estadoSolicitud = asyncHandler(async (req, res) => {
     categoria_asignada: aprobada ? solicitud.categoria_asignada : null,
     // Aviso de que la cuenta fue habilitada (la app lo muestra como "mail recibido").
     mail_habilitacion: aprobada,
-    // El código de validación NO se expone acá: llega por mail al aprobar.
+    // Como no hay servidor de correo real, el "mail" se simula en la app: una vez
+    // aprobada, se devuelve el código para que el usuario lo vea y lo confirme.
+    codigo_validacion: aprobada ? solicitud.codigo_validacion : null,
   });
 });
 
 /* 1.2 Completar Registro (Etapa 2) — POST /auth/registro-etapa2
-   La clave se genera DESPUÉS de la aprobación y se valida con el código que se
-   envió por mail al habilitar la cuenta. */
+   Una vez aprobada la solicitud, el usuario ingresa a la app, confirma el código
+   de validación (el "mail") y GENERA SU CLAVE PERSONAL. El gate es la aprobación
+   manual de la empresa (vía Postman). */
 const registroEtapa2 = asyncHandler(async (req, res) => {
   const { id_solicitud, email, password_personal, codigo } = req.body;
   if (!id_solicitud || !password_personal) {
     throw new AppError('Solicitud y clave personal son obligatorias', 400);
+  }
+  if (String(password_personal).length < 6) {
+    throw new AppError('La clave debe tener al menos 6 caracteres', 400);
   }
   const solicitud = await SolicitudRegistro.findByPk(id_solicitud);
   if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
@@ -123,11 +129,18 @@ const registroEtapa2 = asyncHandler(async (req, res) => {
     throw new AppError('Código de validación incorrecto (revisá tu mail)', 400);
   }
 
+  // Si la cuenta ya fue activada antes, no se crea de nuevo: que inicie sesión.
+  const emailFinal = email || solicitud.email;
+  const yaActivada = await Usuario.findOne({ where: { email: emailFinal } });
+  if (yaActivada) {
+    throw new AppError('Esta cuenta ya fue activada. Iniciá sesión con tu email y clave.', 409);
+  }
+
   const password_hash = await bcrypt.hash(password_personal, 10);
   const usuario = await Usuario.create({
     nombre: solicitud.nombre,
     apellido: solicitud.apellido,
-    email: email || solicitud.email,
+    email: emailFinal,
     password_hash,
     dni_frente: solicitud.dni_frente,
     dni_dorso: solicitud.dni_dorso,
@@ -196,6 +209,7 @@ const adminResolverSolicitud = asyncHandler(async (req, res) => {
   solicitud.mail_habilitacion_enviado = true;
   await solicitud.save();
 
+  // Aviso estilo consigna + código de validación (el "mail").
   enviarMail(
     solicitud.email,
     'Tu cuenta de BidMaster fue habilitada',
@@ -211,11 +225,42 @@ const adminResolverSolicitud = asyncHandler(async (req, res) => {
   });
 });
 
+/* Reanudar la validación desde el Login — POST /auth/reanudar-registro
+   Permite que un usuario que cerró sesión vuelva a la pantalla de validación
+   ingresando su email (recupera su id_solicitud). */
+const reanudarRegistro = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email || !emailFormatoValido(email)) {
+    throw new AppError('Ingresá un email válido', 400);
+  }
+  const correo = email.trim();
+
+  // Si ya activó la cuenta, que inicie sesión normalmente.
+  const usuario = await Usuario.findOne({ where: { email: correo } });
+  if (usuario) {
+    return res.status(200).json({ ya_activada: true, email: correo });
+  }
+
+  const solicitud = await SolicitudRegistro.findOne({
+    where: { email: correo },
+    order: [['createdAt', 'DESC']],
+  });
+  if (!solicitud) {
+    throw new AppError('No encontramos un registro con ese email. Registrate primero.', 404);
+  }
+  res.status(200).json({
+    id_solicitud: solicitud.id_solicitud,
+    email: correo,
+    estado: solicitud.estado, // pendiente | aprobada | rechazada
+  });
+});
+
 module.exports = {
   login,
   registroEtapa1,
   estadoSolicitud,
   registroEtapa2,
+  reanudarRegistro,
   recuperarPassword,
   adminListarSolicitudes,
   adminResolverSolicitud,

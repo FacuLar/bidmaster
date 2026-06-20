@@ -57,6 +57,11 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.olvido}>¿Olvidaste tu contraseña?</Text>
         </TouchableOpacity>
 
+        {/* Retomar la validación si ya te registraste y cerraste sesión. */}
+        <TouchableOpacity onPress={() => navigation.navigate('ValidarCuenta')}>
+          <Text style={styles.validar}>Ya me registré · Validar mi cuenta</Text>
+        </TouchableOpacity>
+
         <View style={styles.sep}>
           <View style={styles.sepLinea} />
           <Text style={styles.sepTxt}>¿No tenés cuenta?</Text>
@@ -90,6 +95,7 @@ const styles = StyleSheet.create({
   titulo: { fontSize: 21, fontWeight: '800', color: colors.azulMarino, textAlign: 'center' },
   subtitulo: { fontSize: 13, color: colors.grisTexto, textAlign: 'center', marginTop: 4, marginBottom: 18 },
   olvido: { color: colors.naranja, textAlign: 'center', marginTop: 14, fontWeight: '600' },
+  validar: { color: colors.azulMarino, textAlign: 'center', marginTop: 12, fontWeight: '700', fontSize: 13 },
   sep: { flexDirection: 'row', alignItems: 'center', marginTop: 18, marginBottom: 6 },
   sepLinea: { flex: 1, height: 1, backgroundColor: colors.grisBorde },
   sepTxt: { color: colors.grisTexto, fontSize: 12, marginHorizontal: 10, fontWeight: '600' },
