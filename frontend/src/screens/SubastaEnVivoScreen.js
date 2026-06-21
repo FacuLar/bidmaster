@@ -69,9 +69,16 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
         Alert.alert('Puja rechazada', e.motivo);
       });
 
-      // Reloj de cierre (arranca con el primer puja de la subasta).
-      socket.on('subasta_timer', ({ cierra_ts }) => {
-        cierreTsRef.current = cierra_ts;
+      // Reloj de cierre (arranca con el primer puja de la subasta). Se ancla al
+      // reloj LOCAL usando segundos_restantes para evitar el desfasaje entre el
+      // reloj del celular y el del servidor (que hacía cerrar "antes de tiempo").
+      socket.on('subasta_timer', ({ cierra_ts, segundos_restantes }) => {
+        if (segundos_restantes != null) {
+          cierreTsRef.current = Date.now() + segundos_restantes * 1000;
+          setSegundos(segundos_restantes);
+        } else if (cierra_ts) {
+          cierreTsRef.current = cierra_ts;
+        }
       });
 
       // La subasta terminó: se declara ganador y se libera el bloqueo de salida.

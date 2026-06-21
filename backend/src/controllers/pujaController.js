@@ -1,4 +1,4 @@
-const { Pieza, Venta, Subasta, MedioPago } = require('../models');
+const { Pieza, Venta, Subasta, MedioPago, Multa } = require('../models');
 const { AppError, asyncHandler } = require('../middleware/errorHandler');
 const { registrarPuja } = require('../services/pujaService');
 const { calcularFactura, pagarPieza } = require('../services/ventaService');
@@ -82,6 +82,22 @@ const pagar = asyncHandler(async (req, res) => {
   // Sólo el ganador (líder) puede pagar.
   if (String(pieza.lider_id) !== String(req.usuario.id)) {
     throw new AppError('No sos el ganador de esta pieza', 403);
+  }
+
+  // Con una multa pendiente la cuenta está bloqueada: hay que pagarla primero.
+  const multaActiva = await Multa.findOne({
+    where: { usuario_id: req.usuario.id, estado: 'con_deuda' },
+  });
+  if (multaActiva) {
+    throw new AppError('Tenés una multa pendiente. Pagala para reactivar tu cuenta y poder operar.', 403);
+  }
+
+  // Si la pieza ya fue pagada, no se vuelve a cobrar.
+  const ventaPrevia = await Venta.findOne({
+    where: { pieza_id: pieza.id, usuario_id: req.usuario.id },
+  });
+  if (ventaPrevia && ventaPrevia.estado_pago === 'pagada') {
+    throw new AppError('Esta pieza ya está pagada', 400);
   }
 
   const subasta = await Subasta.findByPk(pieza.subasta_id);

@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { Usuario, Subasta, Pieza } = require('../models');
+const { Usuario, Subasta, Pieza, Multa } = require('../models');
 const { registrarPuja, subastaComprometida } = require('../services/pujaService');
 const { cerrarPieza } = require('../services/ventaService');
 const { JWT_SECRET } = require('../middleware/auth');
@@ -76,6 +76,14 @@ function initSockets(io, app) {
     /* Unirse a la sala de una subasta. Si ya está comprometido (pujó) en otra
        subasta activa, queda bloqueado: no puede entrar a esta. */
     socket.on('join_subasta', async ({ id_subasta }) => {
+      // Con una multa pendiente la cuenta está bloqueada: no puede unirse.
+      const multa = await Multa.findOne({ where: { usuario_id: usuario.id, estado: 'con_deuda' } });
+      if (multa) {
+        socket.emit('error_sala', {
+          motivo: 'Tenés una multa pendiente. Pagala para volver a participar en subastas.',
+        });
+        return;
+      }
       const comprometida = await subastaComprometida(usuario.id);
       if (comprometida && String(comprometida) !== String(id_subasta)) {
         socket.emit('error_sala', {
@@ -93,7 +101,12 @@ function initSockets(io, app) {
       socket.emit('sala_unida', { id_subasta });
       // Si la subasta ya tiene cierre programado, informa cuánto falta.
       if (cierres[id_subasta]) {
-        socket.emit('subasta_timer', { id_subasta, cierra_ts: cierres[id_subasta].cierra_ts });
+        const cierra_ts = cierres[id_subasta].cierra_ts;
+        socket.emit('subasta_timer', {
+          id_subasta,
+          cierra_ts,
+          segundos_restantes: Math.max(0, Math.round((cierra_ts - Date.now()) / 1000)),
+        });
       }
     });
 
@@ -146,7 +159,9 @@ function initSockets(io, app) {
             timer: setTimeout(() => cerrarSubasta(resultado.id_subasta), DURACION_SUBASTA_MS),
           };
           io.to(`subasta_${resultado.id_subasta}`).emit('subasta_timer', {
-            id_subasta: resultado.id_subasta, cierra_ts,
+            id_subasta: resultado.id_subasta,
+            cierra_ts,
+            segundos_restantes: Math.max(0, Math.round((cierra_ts - Date.now()) / 1000)),
           });
         }
       } catch (err) {

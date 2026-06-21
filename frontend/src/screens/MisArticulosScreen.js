@@ -86,6 +86,16 @@ export default function MisArticulosScreen({ navigation }) {
         </>
       )}
 
+      {/* Programado: aceptó la tasación; mostramos cuándo y dónde se subasta. */}
+      {item.estado === 'Programado' && (
+        <>
+          <Text style={styles.programado}>✓ Programado para subasta</Text>
+          <Text style={styles.info}>📅 Fecha: {item.fecha_subasta ? String(item.fecha_subasta).slice(0, 10) : 'a confirmar'}</Text>
+          <Text style={styles.info}>💲 Valor base: ${Number(item.valor_base_sugerido).toLocaleString()}  ·  Comisión: {item.comisiones}%</Text>
+          {item.ubicacion_deposito ? <Text style={styles.info}>📍 {item.ubicacion_deposito}</Text> : null}
+        </>
+      )}
+
       {/* Vendido: el vendedor SOLO ve cuánto se vendió y la comisión (#19). */}
       {item.estado === 'Vendido' && (
         <>
@@ -146,6 +156,7 @@ const styles = StyleSheet.create({
   t: { fontWeight: '800', color: colors.azulMarino, flex: 1, marginRight: 8 },
   v: { color: colors.textoOscuro, marginTop: 6, fontWeight: '700' },
   vendido: { color: colors.verde, marginTop: 6, fontWeight: '800', fontSize: 16 },
+  programado: { color: colors.azulMarino, marginTop: 6, fontWeight: '800' },
   info: { color: colors.grisTexto, marginTop: 4, fontSize: 13 },
   acciones: { flexDirection: 'row', marginTop: 8 },
   vacio: { textAlign: 'center', color: colors.grisTexto, marginTop: 40 },

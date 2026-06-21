@@ -10,22 +10,24 @@ export default function SubastaGanadaScreen({ route, navigation }) {
   const [pagando, setPagando] = useState(false);
 
   async function pagar() {
-    // Sin id de pieza (demo desde "Mis Pujas") se confirma localmente.
     if (!pieza?.id_pieza) {
-      Alert.alert('Pago registrado', 'Se abonó con tu medio de pago registrado.', [
-        { text: 'OK', onPress: () => navigation.navigate('Main') },
-      ]);
+      Alert.alert('No se puede pagar', 'No pudimos identificar la pieza. Volvé a entrar desde "Mis Pujas".');
       return;
     }
     setPagando(true);
     try {
-      // Elige un medio de pago verificado para liquidar.
+      // Elige un medio de pago verificado EN LA MONEDA correcta para liquidar.
       const medios = await PagoAPI.listar();
-      const medio = medios.find((m) => m.estado_verificacion === 'Verificado');
-      if (!medio) {
+      const verificados = medios.filter((m) => m.estado_verificacion === 'Verificado');
+      if (!verificados.length) {
         Alert.alert('Sin medio verificado', 'Agregá un medio de pago verificado en tu Billetera.');
         return;
       }
+      // Prioriza un medio con saldo suficiente; si no, usa el de mayor saldo.
+      const total = Number(factura.total_a_pagar) || 0;
+      const medio = verificados.find((m) => Number(m.saldo_disponible) >= total)
+        || verificados.sort((a, b) => b.saldo_disponible - a.saldo_disponible)[0];
+
       const { status, data } = await PujaAPI.pagar(pieza.id_pieza, medio.id);
       if (status === 402) {
         // Fondos insuficientes → multa del 10% (consigna).
@@ -38,7 +40,8 @@ export default function SubastaGanadaScreen({ route, navigation }) {
         ]);
       }
     } catch (e) {
-      Alert.alert('Error al pagar', e.message);
+      // 403 si hay multa pendiente u otro bloqueo del backend.
+      Alert.alert('No se pudo pagar', e.message);
     } finally {
       setPagando(false);
     }

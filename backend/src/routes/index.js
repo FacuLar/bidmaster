@@ -18,6 +18,7 @@ router.post('/auth/reanudar-registro', auth.reanudarRegistro); // volver a valid
 router.post('/auth/recuperar-password', auth.recuperarPassword); // corrección de diseño
 router.get('/usuarios/perfil/metricas', requireAuth, usuario.metricas);
 router.get('/usuarios/multas', requireAuth, usuario.multas);
+router.post('/usuarios/multas/pagar', requireAuth, usuario.pagarMulta);
 
 /* --------------------- Módulo 2: Billetera ------------------------- */
 router.post('/pagos/medios', requireAuth, pago.registrarMedio);

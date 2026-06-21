@@ -20,6 +20,11 @@ export const AuthAPI = {
 export const UsuarioAPI = {
   metricas: () => api.get('/usuarios/perfil/metricas').then((r) => r.data),
   multas: () => api.get('/usuarios/multas').then((r) => r.data),
+  // Devuelve {status, data}: 200 pagada / 402 sin fondos.
+  pagarMulta: (id_medio_pago) =>
+    api.post('/usuarios/multas/pagar', { id_medio_pago },
+      { validateStatus: (s) => s === 200 || s === 402 })
+      .then((r) => ({ status: r.status, data: r.data })),
 };
 
 export const PagoAPI = {

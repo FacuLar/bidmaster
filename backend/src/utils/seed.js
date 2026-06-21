@@ -31,7 +31,8 @@ async function seed() {
 
   /* --------------------------- Medios de pago ------------------------- */
   await MedioPago.create({
-    tipo: 'TARJETA', entidad: 'Visa', numero_identificador: '**** 4092',
+    tipo: 'TARJETA', entidad: 'Visa', numero_identificador: '**** 6467',
+    marca: 'VISA', titular: 'Facundo Pérez', vencimiento: '08/30',
     moneda: 'ARS', saldo_disponible: 500000, estado_verificacion: 'Verificado', usuario_id: facundo.id,
   });
   // Cuenta en USD verificada: habilita pujar en subastas en dólares.
