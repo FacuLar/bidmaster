@@ -101,6 +101,13 @@ const pagar = asyncHandler(async (req, res) => {
   }
 
   const subasta = await Subasta.findByPk(pieza.subasta_id);
+
+  // Sólo se paga DESPUÉS de que la subasta cerró y resultaste ganador. Mientras
+  // la subasta sigue abierta, todavía no ganaste nada: no se puede pagar.
+  if (subasta.estado !== 'finalizada' && pieza.estado !== 'vendida') {
+    throw new AppError('La subasta sigue en curso. Vas a poder pagar cuando termine, si resultás ganador.', 403);
+  }
+
   const medio = await MedioPago.findOne({
     where: { id: id_medio_pago, usuario_id: req.usuario.id, estado_verificacion: 'Verificado' },
   });
@@ -131,6 +138,8 @@ const pagar = asyncHandler(async (req, res) => {
   res.status(200).json({
     estado: 'pagada',
     total_pagado: resultado.factura.total,
+    saldo_restante: medio.saldo_disponible, // saldo del medio tras descontar
+    medio: `${medio.tipo} ${medio.numero_identificador || ''}`.trim(),
     nueva_categoria: categoria,
   });
 });

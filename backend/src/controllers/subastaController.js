@@ -80,11 +80,37 @@ const streaming = asyncHandler(async (req, res) => {
     throw new AppError('Categoría insuficiente para esta subasta', 403);
   }
 
-  const medioVerificado = await MedioPago.findOne({
-    where: { usuario_id: req.usuario.id, estado_verificacion: 'Verificado', moneda: subasta.moneda },
-  });
-  if (!medioVerificado) {
-    throw new AppError(`Necesitás un medio de pago verificado en ${subasta.moneda}`, 403);
+  // Medio de pago: el usuario elige cuál usar (id_medio). Si no manda ninguno,
+  // se toma el primero verificado en la moneda de la subasta (compatibilidad).
+  let medioVerificado;
+  if (req.query.id_medio) {
+    medioVerificado = await MedioPago.findOne({
+      where: {
+        id: req.query.id_medio, usuario_id: req.usuario.id,
+        estado_verificacion: 'Verificado', moneda: subasta.moneda,
+      },
+    });
+    if (!medioVerificado) {
+      throw new AppError(`El medio elegido no es válido o no está verificado en ${subasta.moneda}`, 403);
+    }
+  } else {
+    medioVerificado = await MedioPago.findOne({
+      where: { usuario_id: req.usuario.id, estado_verificacion: 'Verificado', moneda: subasta.moneda },
+    });
+    if (!medioVerificado) {
+      throw new AppError(`Necesitás un medio de pago verificado en ${subasta.moneda}`, 403);
+    }
+  }
+
+  // No se puede entrar con un medio que no cubra ni el precio base de la pieza.
+  if (req.query.id_pieza) {
+    const pieza = await Pieza.findByPk(req.query.id_pieza);
+    if (pieza && medioVerificado.saldo_disponible < pieza.precio_base) {
+      throw new AppError(
+        'El medio seleccionado no tiene saldo para cubrir el precio base de esta pieza. Elegí otro o cargá fondos.',
+        403,
+      );
+    }
   }
 
   // COMPROMISO: si el usuario ya pujó en otra subasta que sigue activa, queda

@@ -35,7 +35,10 @@ export default function SubastaGanadaScreen({ route, navigation }) {
           { text: 'Ver multa', onPress: () => navigation.navigate('AvisoMulta', { multa: { monto_multa: data.monto_multa, horas_restantes: data.horas_restantes } }) },
         ]);
       } else {
-        Alert.alert('¡Pago exitoso!', `Total abonado: $${Number(data.total_pagado).toLocaleString()}`, [
+        const saldo = data.saldo_restante != null
+          ? `\nSaldo restante en ${data.medio || 'tu medio'}: $${Number(data.saldo_restante).toLocaleString()}`
+          : '';
+        Alert.alert('¡Pago exitoso!', `Total abonado: $${Number(data.total_pagado).toLocaleString()}${saldo}`, [
           { text: 'OK', onPress: () => navigation.navigate('Main') },
         ]);
       }

@@ -208,8 +208,12 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
           <Text style={styles.aviso}>🔒 Ya pujaste: no podés salir ni entrar a otra subasta hasta que esta termine.</Text>
         )}
 
-        {(soyLider || cerrada) && (
-          <Boton title="VER LIQUIDACIÓN (si ganás)" variant="dark" onPress={verFactura} />
+        {/* La liquidación/pago solo cuando la subasta CERRÓ y resultaste ganador. */}
+        {cerrada && soyLider && (
+          <Boton title="VER LIQUIDACIÓN Y PAGAR" variant="dark" onPress={verFactura} />
+        )}
+        {!cerrada && soyLider && (
+          <Text style={styles.aviso}>Vas ganando. Cuando cierre la subasta vas a poder pagar la pieza.</Text>
         )}
 
         {(cerrada || !pujé) && (

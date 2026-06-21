@@ -37,7 +37,9 @@ export const SubastaAPI = {
   listar: (moneda) =>
     api.get('/subastas', { params: moneda ? { moneda } : {} }).then((r) => r.data),
   catalogo: (id) => api.get(`/subastas/${id}/catalogo`).then((r) => r.data),
-  streaming: (id) => api.get(`/subastas/${id}/streaming`).then((r) => r.data),
+  // params opcionales: { id_medio, id_pieza } para elegir el medio y validar fondos.
+  streaming: (id, params = {}) =>
+    api.get(`/subastas/${id}/streaming`, { params }).then((r) => r.data),
 };
 
 export const PujaAPI = {
