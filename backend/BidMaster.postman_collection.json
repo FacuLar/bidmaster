@@ -1,0 +1,373 @@
+{
+  "info": {
+    "_postman_id": "b1dm45t3-0000-4000-8000-bidmaster0001",
+    "name": "BidMaster API",
+    "description": "Colección completa de la API de BidMaster (TPO DAI).\n\nCÓMO USARLA\n1) Revisá las variables de la colección (pestaña Variables): baseUrl, adminKey, token, id_subasta, id_pieza, id_medio, id_solicitud.\n2) Para los endpoints con candado de usuario (🔑) primero corré 'Auth > Login' — el token se guarda solo en la variable {{token}}.\n3) Para los de admin (🛡️) ya va el header x-admin-key con {{adminKey}}.\n\nLeyenda: 🔓 público · 🔑 token de usuario · 🛡️ admin (x-admin-key).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000/api/v1" },
+    { "key": "adminKey", "value": "bidmaster_admin_2026" },
+    { "key": "token", "value": "" },
+    { "key": "id_subasta", "value": "1" },
+    { "key": "id_pieza", "value": "1" },
+    { "key": "id_medio", "value": "1" },
+    { "key": "id_tramite", "value": "1" },
+    { "key": "id_solicitud", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1 · Autenticación / Cuenta",
+      "item": [
+        {
+          "name": "🔓 Login (guarda el token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "try {",
+                  "  var d = pm.response.json();",
+                  "  if (d.token) {",
+                  "    pm.collectionVariables.set('token', d.token);",
+                  "    console.log('Token guardado en {{token}}');",
+                  "  }",
+                  "} catch (e) {}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"facundo@ejemplo.com\",\n  \"password_personal\": \"123456\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Inicia sesión. Guarda automáticamente el token en {{token}} para el resto de los pedidos 🔑."
+          }
+        },
+        {
+          "name": "🔓 Registro etapa 1",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/auth/registro-etapa1", "host": ["{{baseUrl}}"], "path": ["auth", "registro-etapa1"] },
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Ana\",\n  \"apellido\": \"Lopez\",\n  \"email\": \"ana.lopez@gmail.com\",\n  \"domicilio_legal\": \"Av Santa Fe 1660, Buenos Aires\",\n  \"pais_origen\": \"Argentina\",\n  \"dni_frente\": \"data:image/png;base64,REEMPLAZAR_POR_IMAGEN_REAL\",\n  \"dni_dorso\": \"data:image/png;base64,REEMPLAZAR_POR_IMAGEN_REAL\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Inicia el registro (queda pendiente de aprobación). Nota: dni_frente/dni_dorso deben ser imágenes reales en base64 (el registro normalmente se hace desde la app)."
+          }
+        },
+        {
+          "name": "🔓 Estado de la solicitud",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/solicitudes/{{id_solicitud}}/estado", "host": ["{{baseUrl}}"], "path": ["auth", "solicitudes", "{{id_solicitud}}", "estado"] },
+            "description": "Devuelve el estado (pendiente/aprobada/rechazada) y, si está aprobada, el código de validación."
+          }
+        },
+        {
+          "name": "🔓 Registro etapa 2 (activar cuenta)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/auth/registro-etapa2", "host": ["{{baseUrl}}"], "path": ["auth", "registro-etapa2"] },
+            "body": { "mode": "raw", "raw": "{\n  \"id_solicitud\": \"{{id_solicitud}}\",\n  \"email\": \"ana.lopez@gmail.com\",\n  \"password_personal\": \"clave123\",\n  \"codigo\": \"123456\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Activa la cuenta generando la clave personal (requiere el código que devolvió la aprobación)."
+          }
+        },
+        {
+          "name": "🔓 Reanudar registro (por email)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/auth/reanudar-registro", "host": ["{{baseUrl}}"], "path": ["auth", "reanudar-registro"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"ana.lopez@gmail.com\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Recupera la solicitud por email para retomar la validación tras cerrar sesión."
+          }
+        },
+        {
+          "name": "🔓 Recuperar contraseña (pedir código)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/auth/recuperar-password", "host": ["{{baseUrl}}"], "path": ["auth", "recuperar-password"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"facundo@ejemplo.com\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Genera un código de recuperación (se devuelve en la respuesta porque no hay servidor de mail)."
+          }
+        },
+        {
+          "name": "🔓 Resetear contraseña (con código)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/auth/resetear-password", "host": ["{{baseUrl}}"], "path": ["auth", "resetear-password"] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"facundo@ejemplo.com\",\n  \"codigo\": \"123456\",\n  \"password_nueva\": \"nueva123\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Setea la nueva contraseña con el código de recuperación."
+          }
+        },
+        {
+          "name": "🔑 Métricas del perfil",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/usuarios/perfil/metricas", "host": ["{{baseUrl}}"], "path": ["usuarios", "perfil", "metricas"] }
+          }
+        },
+        {
+          "name": "🔑 Ver multa activa",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/usuarios/multas", "host": ["{{baseUrl}}"], "path": ["usuarios", "multas"] }
+          }
+        },
+        {
+          "name": "🔑 Pagar la multa",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/usuarios/multas/pagar", "host": ["{{baseUrl}}"], "path": ["usuarios", "multas", "pagar"] },
+            "body": { "mode": "raw", "raw": "{\n  \"id_medio_pago\": {{id_medio}}\n}", "options": { "raw": { "language": "json" } } }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Billetera (medios de pago)",
+      "item": [
+        {
+          "name": "🔑 Registrar medio — TARJETA",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/pagos/medios", "host": ["{{baseUrl}}"], "path": ["pagos", "medios"] },
+            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"TARJETA\",\n  \"entidad\": \"Visa\",\n  \"numero_identificador\": \"4539 1488 0343 6467\",\n  \"cvv\": \"123\",\n  \"vencimiento\": \"08/30\",\n  \"titular\": \"Facundo Perez\",\n  \"moneda\": \"ARS\",\n  \"saldo_disponible\": 300000\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Queda Pendiente hasta que un admin la verifique."
+          }
+        },
+        {
+          "name": "🔑 Registrar medio — CHEQUE",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/pagos/medios", "host": ["{{baseUrl}}"], "path": ["pagos", "medios"] },
+            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"CHEQUE\",\n  \"entidad\": \"Banco Nacion\",\n  \"numero_cheque\": \"12345678\",\n  \"banco\": \"Nacion\",\n  \"monto_certificado\": 50000,\n  \"moneda\": \"ARS\"\n}", "options": { "raw": { "language": "json" } } }
+          }
+        },
+        {
+          "name": "🔑 Registrar medio — CUENTA",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/pagos/medios", "host": ["{{baseUrl}}"], "path": ["pagos", "medios"] },
+            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"CUENTA\",\n  \"entidad\": \"Citibank\",\n  \"numero_identificador\": \"0110599592000000123454\",\n  \"moneda\": \"USD\",\n  \"saldo_disponible\": 80000\n}", "options": { "raw": { "language": "json" } } }
+          }
+        },
+        {
+          "name": "🔑 Listar mis medios",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/pagos/medios", "host": ["{{baseUrl}}"], "path": ["pagos", "medios"] }
+          }
+        },
+        {
+          "name": "🔑 Estado de un medio",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/pagos/medios/{{id_medio}}/estado", "host": ["{{baseUrl}}"], "path": ["pagos", "medios", "{{id_medio}}", "estado"] }
+          }
+        },
+        {
+          "name": "🔑 Eliminar un medio",
+          "request": {
+            "method": "DELETE",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/pagos/medios/{{id_medio}}", "host": ["{{baseUrl}}"], "path": ["pagos", "medios", "{{id_medio}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Catálogo y Subastas",
+      "item": [
+        {
+          "name": "🔓 Listar subastas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/subastas?moneda=ARS", "host": ["{{baseUrl}}"], "path": ["subastas"], "query": [ { "key": "moneda", "value": "ARS" } ] }
+          }
+        },
+        {
+          "name": "🔓 Catálogo de una subasta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/subastas/{{id_subasta}}/catalogo", "host": ["{{baseUrl}}"], "path": ["subastas", "{{id_subasta}}", "catalogo"] }
+          }
+        },
+        {
+          "name": "🔑 Ingresar a la sala (streaming)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/subastas/{{id_subasta}}/streaming?id_medio={{id_medio}}&id_pieza={{id_pieza}}", "host": ["{{baseUrl}}"], "path": ["subastas", "{{id_subasta}}", "streaming"], "query": [ { "key": "id_medio", "value": "{{id_medio}}" }, { "key": "id_pieza", "value": "{{id_pieza}}" } ] },
+            "description": "Valida categoría + medio verificado + fondos para el precio base."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Pujas y Pago",
+      "item": [
+        {
+          "name": "🔑 Pujar",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/pujas", "host": ["{{baseUrl}}"], "path": ["pujas"] },
+            "body": { "mode": "raw", "raw": "{\n  \"id_subasta\": {{id_subasta}},\n  \"id_pieza\": {{id_pieza}},\n  \"monto_oferta\": 45500,\n  \"id_medio_pago\": {{id_medio}}\n}", "options": { "raw": { "language": "json" } } },
+            "description": "En la app las pujas en vivo van por WebSocket; este endpoint REST hace la misma validación."
+          }
+        },
+        {
+          "name": "🔑 Factura / liquidación",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/ventas/{{id_pieza}}/factura", "host": ["{{baseUrl}}"], "path": ["ventas", "{{id_pieza}}", "factura"] }
+          }
+        },
+        {
+          "name": "🔑 Pagar la pieza ganada",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/ventas/{{id_pieza}}/pagar", "host": ["{{baseUrl}}"], "path": ["ventas", "{{id_pieza}}", "pagar"] },
+            "body": { "mode": "raw", "raw": "{\n  \"id_medio_pago\": {{id_medio}},\n  \"retiro_personal\": false\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Solo si la subasta cerró y ganaste. Si no hay fondos, aplica multa del 10%."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · Vendedor (subastar un bien)",
+      "item": [
+        {
+          "name": "🔑 Listar mis artículos",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/vendedores/articulos", "host": ["{{baseUrl}}"], "path": ["vendedores", "articulos"] }
+          }
+        },
+        {
+          "name": "🔑 Proponer un bien",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/vendedores/articulos", "host": ["{{baseUrl}}"], "path": ["vendedores", "articulos"] },
+            "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"Reloj de coleccion\",\n  \"descripcion\": \"Pieza antigua\",\n  \"tipo_bien\": \"otro\",\n  \"fotos\": [\"f1\",\"f2\",\"f3\",\"f4\",\"f5\",\"f6\"],\n  \"declaracion_jurada_licita\": true,\n  \"acepta_devolucion\": true,\n  \"acepta_terminos\": true,\n  \"acredita_origen\": true\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Requiere una CUENTA registrada y mínimo 6 fotos (en la app son imágenes base64)."
+          }
+        },
+        {
+          "name": "🔑 Inspección (ENVIAR / CANCELAR)",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/vendedores/articulos/{{id_tramite}}/inspeccion", "host": ["{{baseUrl}}"], "path": ["vendedores", "articulos", "{{id_tramite}}", "inspeccion"] },
+            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"ENVIAR\"\n}", "options": { "raw": { "language": "json" } } }
+          }
+        },
+        {
+          "name": "🔑 Tasación (ACEPTAR / RECHAZAR)",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/vendedores/articulos/{{id_tramite}}/condiciones", "host": ["{{baseUrl}}"], "path": ["vendedores", "articulos", "{{id_tramite}}", "condiciones"] },
+            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"ACEPTAR\"\n}", "options": { "raw": { "language": "json" } } }
+          }
+        },
+        {
+          "name": "🔑 Devolución (RETIRO / ENVIO)",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/vendedores/articulos/{{id_tramite}}/devolucion", "host": ["{{baseUrl}}"], "path": ["vendedores", "articulos", "{{id_tramite}}", "devolucion"] },
+            "body": { "mode": "raw", "raw": "{\n  \"metodo\": \"ENVIO\"\n}", "options": { "raw": { "language": "json" } } }
+          }
+        },
+        {
+          "name": "🔑 Factura del flete",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/vendedores/articulos/{{id_tramite}}/factura-flete", "host": ["{{baseUrl}}"], "path": ["vendedores", "articulos", "{{id_tramite}}", "factura-flete"] }
+          }
+        },
+        {
+          "name": "🔑 Ubicación y seguro",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/vendedores/articulos/{{id_tramite}}/logistica", "host": ["{{baseUrl}}"], "path": ["vendedores", "articulos", "{{id_tramite}}", "logistica"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 · 🛡️ ADMIN (aprobaciones por Postman)",
+      "item": [
+        {
+          "name": "🛡️ Ver registros pendientes",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "x-admin-key", "value": "{{adminKey}}" } ],
+            "url": { "raw": "{{baseUrl}}/admin/solicitudes?estado=pendiente", "host": ["{{baseUrl}}"], "path": ["admin", "solicitudes"], "query": [ { "key": "estado", "value": "pendiente" } ] },
+            "description": "Lista las solicitudes de registro. Copiá el id_solicitud (UUID) que quieras aprobar."
+          }
+        },
+        {
+          "name": "🛡️ Aprobar cuenta + dar categoría",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "x-admin-key", "value": "{{adminKey}}" } ],
+            "url": { "raw": "{{baseUrl}}/admin/solicitudes/{{id_solicitud}}/resolver", "host": ["{{baseUrl}}"], "path": ["admin", "solicitudes", "{{id_solicitud}}", "resolver"] },
+            "body": { "mode": "raw", "raw": "{\n  \"aprobar\": true,\n  \"categoria\": \"oro\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Aprueba el registro y asigna categoría (comun|especial|plata|oro|platino). Devuelve el codigo_validacion para activar en la app. Para rechazar: { \"aprobar\": false }."
+          }
+        },
+        {
+          "name": "🛡️ Ver medios de pago pendientes",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "x-admin-key", "value": "{{adminKey}}" } ],
+            "url": { "raw": "{{baseUrl}}/admin/pagos/medios?estado=Pendiente", "host": ["{{baseUrl}}"], "path": ["admin", "pagos", "medios"], "query": [ { "key": "estado", "value": "Pendiente" } ] }
+          }
+        },
+        {
+          "name": "🛡️ Verificar un medio de pago",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "x-admin-key", "value": "{{adminKey}}" } ],
+            "url": { "raw": "{{baseUrl}}/admin/pagos/medios/{{id_medio}}/verificar", "host": ["{{baseUrl}}"], "path": ["admin", "pagos", "medios", "{{id_medio}}", "verificar"] },
+            "body": { "mode": "raw", "raw": "{\n  \"aprobar\": true,\n  \"saldo_disponible\": 750000\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Habilita el medio para pujar. saldo_disponible es opcional. Para rechazar: { \"aprobar\": false }."
+          }
+        },
+        {
+          "name": "🛡️ Comenzar una subasta",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "x-admin-key", "value": "{{adminKey}}" } ],
+            "url": { "raw": "{{baseUrl}}/admin/subastas/{{id_subasta}}/comenzar", "host": ["{{baseUrl}}"], "path": ["admin", "subastas", "{{id_subasta}}", "comenzar"] },
+            "description": "Arranca el remate secuencial: remata ítem por ítem, en orden, hasta terminar el catálogo."
+          }
+        }
+      ]
+    }
+  ]
+}
