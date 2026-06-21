@@ -9,12 +9,12 @@ const COMISION_DEFAULT = 10;         // % de comisión de la empresa
 function leInteresa(titulo) {
   const t = (titulo || '').toLowerCase();
   if (t.trim().length < 3) return false;
-  return !/(roto|basura|replica|trucho|falso|chatarra)/.test(t);
+  return !/(rot[oa]|basura|replica|trucho|fals[oa]|chatarra|quemad[oa])/.test(t);
 }
 // Tras la inspección física, ¿el bien está en condiciones? (hardcodeado)
 function enCondiciones(titulo) {
   const t = (titulo || '').toLowerCase();
-  return !/(dudoso|dañad|deteriorad|incompleto)/.test(t);
+  return !/(dudos[oa]|dañad[oa]|deteriorad[oa]|incomplet[oa]|roto|rota)/.test(t);
 }
 
 /* 5.0 Listar Mis Artículos — GET /vendedores/articulos

@@ -15,6 +15,8 @@ export const AuthAPI = {
     api.post('/auth/reanudar-registro', { email }).then((r) => r.data),
   recuperarPassword: (email) =>
     api.post('/auth/recuperar-password', { email }).then((r) => r.data),
+  resetearPassword: (email, codigo, password_nueva) =>
+    api.post('/auth/resetear-password', { email, codigo, password_nueva }).then((r) => r.data),
 };
 
 export const UsuarioAPI = {

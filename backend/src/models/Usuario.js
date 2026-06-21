@@ -23,6 +23,8 @@ const Usuario = sequelize.define('Usuario', {
   },
   // Cuenta a la vista (puede ser del exterior) para cobrar sus ventas.
   cuenta_cobro: { type: DataTypes.STRING },
+  // Código temporal para restablecer la contraseña ("se envía por mail").
+  codigo_reset: { type: DataTypes.STRING, allowNull: true },
 }, {
   tableName: 'usuarios',
 });

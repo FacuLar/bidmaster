@@ -157,15 +157,54 @@ const registroEtapa2 = asyncHandler(async (req, res) => {
   });
 });
 
-/* Corrección de diseño: "Se me olvidó la contraseña" — POST /auth/recuperar-password */
+/* Corrección de diseño: "Se me olvidó la contraseña" — POST /auth/recuperar-password
+   Genera un código de recuperación y lo "envía por mail". Como no hay servidor de
+   correo, el código se devuelve para mostrarlo en la app (igual que en el registro). */
 const recuperarPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
   if (!email) throw new AppError('El email es obligatorio', 400);
   if (!emailFormatoValido(email)) throw new AppError('El email no tiene un formato válido', 400);
-  // No se revela si el email existe (buena práctica de seguridad).
+
+  const usuario = await Usuario.findOne({ where: { email: email.trim() } });
+  if (!usuario) {
+    // No existe: mensaje genérico (no se confirma ni se niega la existencia).
+    return res.status(200).json({
+      existe: false,
+      mensaje: 'Si el email está registrado, te enviamos instrucciones para restablecer tu clave.',
+    });
+  }
+
+  usuario.codigo_reset = String(Math.floor(100000 + Math.random() * 900000));
+  await usuario.save();
+  enviarMail(usuario.email, 'Restablecé tu clave de BidMaster',
+    `Usá este código para crear una nueva clave: ${usuario.codigo_reset}`);
+
   res.status(200).json({
-    mensaje: 'Si el email está registrado, te enviamos instrucciones para restablecer tu clave.',
+    existe: true,
+    mensaje: 'Te enviamos un código para restablecer tu clave.',
+    codigo_reset: usuario.codigo_reset, // visible en la app (sin servidor de mail)
   });
+});
+
+/* Restablecer la clave con el código — POST /auth/resetear-password */
+const resetearPassword = asyncHandler(async (req, res) => {
+  const { email, codigo, password_nueva } = req.body;
+  if (!email || !codigo || !password_nueva) {
+    throw new AppError('Email, código y nueva clave son obligatorios', 400);
+  }
+  if (String(password_nueva).length < 6) {
+    throw new AppError('La clave debe tener al menos 6 caracteres', 400);
+  }
+  const usuario = await Usuario.findOne({ where: { email: email.trim() } });
+  if (!usuario || !usuario.codigo_reset || String(codigo).trim() !== String(usuario.codigo_reset)) {
+    throw new AppError('Código de recuperación incorrecto', 400);
+  }
+
+  usuario.password_hash = await bcrypt.hash(password_nueva, 10);
+  usuario.codigo_reset = null; // el código se usa una sola vez
+  await usuario.save();
+
+  res.status(200).json({ mensaje: 'Clave actualizada. Ya podés iniciar sesión.' });
 });
 
 /* ===================== ADMIN (sólo por Postman, x-admin-key) ============== */
@@ -262,6 +301,7 @@ module.exports = {
   registroEtapa2,
   reanudarRegistro,
   recuperarPassword,
+  resetearPassword,
   adminListarSolicitudes,
   adminResolverSolicitud,
 };

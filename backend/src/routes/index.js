@@ -16,6 +16,7 @@ router.get('/auth/solicitudes/:id/estado', auth.estadoSolicitud); // estado de v
 router.post('/auth/registro-etapa2', auth.registroEtapa2);
 router.post('/auth/reanudar-registro', auth.reanudarRegistro); // volver a validar por email
 router.post('/auth/recuperar-password', auth.recuperarPassword); // corrección de diseño
+router.post('/auth/resetear-password', auth.resetearPassword); // setea la nueva clave
 router.get('/usuarios/perfil/metricas', requireAuth, usuario.metricas);
 router.get('/usuarios/multas', requireAuth, usuario.multas);
 router.post('/usuarios/multas/pagar', requireAuth, usuario.pagarMulta);

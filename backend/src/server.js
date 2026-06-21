@@ -17,6 +17,9 @@ async function migrarColumnasNuevas() {
   const qi = sequelize.getQueryInterface();
   const { DataTypes } = require('sequelize');
   const nuevas = {
+    usuarios: {
+      codigo_reset: { type: DataTypes.STRING, allowNull: true },
+    },
     medios_pago: {
       marca: { type: DataTypes.STRING, allowNull: true },
       titular: { type: DataTypes.STRING, allowNull: true },
