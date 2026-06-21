@@ -84,6 +84,23 @@ Body: { "aprobar": false }
 
 ---
 
+## 3) Comenzar una subasta (remate secuencial)
+
+Las subastas arrancan **programadas** (no corriendo). Para iniciar el remate
+—que va ítem por ítem, en orden, avanzando solo— se dispara desde Postman:
+
+```
+POST /admin/subastas/:id/comenzar
+Header: x-admin-key: bidmaster_admin_2026
+```
+
+A partir de ahí la subasta queda **activa**: remata el ítem 1 durante unos
+segundos (configurable con `DURACION_ITEM_MS`, default 30s), y al cerrarse pasa
+al siguiente automáticamente hasta terminar el catálogo. Los usuarios conectados
+ven el ítem actual y el reloj en tiempo real.
+
+---
+
 ## Validaciones automáticas (antes de llegar a vos)
 
 ### Registro de usuario

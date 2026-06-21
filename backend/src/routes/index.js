@@ -54,5 +54,7 @@ router.patch('/admin/solicitudes/:id/resolver', requireAdmin, auth.adminResolver
 // Verificación manual de medios de pago.
 router.get('/admin/pagos/medios', requireAdmin, pago.adminListarMedios);
 router.patch('/admin/pagos/medios/:id/verificar', requireAdmin, pago.adminVerificarMedio);
+// Inicio de la subasta (remate secuencial ítem por ítem).
+router.post('/admin/subastas/:id/comenzar', requireAdmin, subasta.adminComenzarSubasta);
 
 module.exports = router;

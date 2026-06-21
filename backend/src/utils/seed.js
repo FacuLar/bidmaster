@@ -63,7 +63,7 @@ async function seed() {
     titulo: 'Subasta de Colección — Plata', fecha: '2026-05-15', hora: '18:00',
     moneda: 'ARS', categoria_requerida: 'plata', rematador: 'J. Pérez',
     ubicacion: 'Salón Central', url_stream: 'wss://stream.bidmaster.com/104',
-    estado: 'activa',
+    estado: 'programada',
   });
   await Pieza.bulkCreate([
     {
@@ -122,7 +122,7 @@ async function seed() {
     titulo: 'Relojería de Lujo — Plata', fecha: '2026-05-15', hora: '17:00',
     moneda: 'USD', categoria_requerida: 'plata', rematador: 'M. López',
     ubicacion: 'Salón VIP', url_stream: 'wss://stream.bidmaster.com/105',
-    estado: 'activa',
+    estado: 'programada',
   });
   await Pieza.bulkCreate([
     {
@@ -130,7 +130,7 @@ async function seed() {
       descripcion: 'Reloj Rolex Ref #402, edición de colección.', precio_base: 10000,
       artista: 'Rolex Geneva', fecha_obra: '1960',
       historia: 'Perteneció a la colección de un diplomático europeo. Estuche original.',
-      imagenes: fotos('rolex,watch'), oferta_actual: 15000,
+      imagenes: fotos('rolex,watch'),
       subasta_id: subastaUsd.id, dueno_id: oro.id,
     },
     {
@@ -159,7 +159,7 @@ async function seed() {
     titulo: 'Maestros del Arte — Oro', fecha: '2026-05-16', hora: '20:00',
     moneda: 'ARS', categoria_requerida: 'oro', rematador: 'C. Iturrioz',
     ubicacion: 'Salón Imperial', url_stream: 'wss://stream.bidmaster.com/106',
-    estado: 'activa',
+    estado: 'programada',
   });
   await Pieza.bulkCreate([
     {

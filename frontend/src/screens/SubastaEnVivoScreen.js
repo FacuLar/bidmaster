@@ -1,250 +1,217 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, Alert, ScrollView,
+  View, Text, StyleSheet, TextInput, Alert, ScrollView, Image, ActivityIndicator,
 } from 'react-native';
 import { Boton, Tarjeta } from '../components/ui';
 import { conectarSocket } from '../api/socket';
-import { PujaAPI } from '../api/endpoints';
+import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
 
 /**
- * Sala de subasta EN VIVO. Recibe en tiempo real la oferta líder y permite
- * pujar. Bloquea la puja hasta recibir confirmación (secuencialidad).
- * Una vez que pujaste no podés salir hasta que la subasta termine (al minuto).
+ * Sala de subasta EN VIVO — modelo SECUENCIAL: la subasta remata un ítem por vez
+ * y avanza sola. La pantalla muestra el ítem que se está rematando AHORA; cuando
+ * cierra, aparece el siguiente automáticamente. Podés entrar, pujar por los ítems
+ * que te interesan e irte a pagar cuando quieras.
  */
 export default function SubastaEnVivoScreen({ route, navigation }) {
-  const { pieza, subasta, medio } = route.params;
+  const { subasta, medio } = route.params;
   const idSubasta = subasta.id_subasta || subasta.id;
-  const [ofertaActual, setOfertaActual] = useState(pieza.oferta_actual || pieza.precio_base || 0);
+  const { usuario } = useAuth();
+  const miId = usuario?.id_usuario;
+  const simbolo = subasta.moneda === 'USD' ? 'US$' : '$';
+
+  const [estado, setEstado] = useState('conectando'); // conectando|programada|en_curso|finalizada
+  const [item, setItem] = useState(null);             // ítem que se remata ahora
+  const [oferta, setOferta] = useState(0);
   const [soyLider, setSoyLider] = useState(false);
   const [monto, setMonto] = useState('');
   const [pujando, setPujando] = useState(false);
-  const [estado, setEstado] = useState('Conectando...');
-  const [pujé, setPujé] = useState(false);       // ya pujé → no puedo salir
-  const [cerrada, setCerrada] = useState(false);  // la subasta terminó
-  const [segundos, setSegundos] = useState(null); // countdown al cierre
+  const [segundos, setSegundos] = useState(null);
+  const [ganados, setGanados] = useState([]);
+
   const socketRef = useRef(null);
   const cierreTsRef = useRef(null);
-  const pujéRef = useRef(false);
-  const soyLiderRef = useRef(false);
+  const itemRef = useRef(null);
+  useEffect(() => { itemRef.current = item; }, [item]);
 
-  const base = pieza.precio_base || 0;
-  const minimo = ofertaActual + 0.01 * base;
+  const base = item?.precio_base || 0;
   const exento = subasta.categoria_requerida === 'oro' || subasta.categoria_requerida === 'platino';
-  const maximo = ofertaActual + 0.20 * base;
+  const minimo = oferta > 0 ? oferta + 0.01 * base : base;
+  const maximo = (oferta > 0 ? oferta : base) + 0.20 * base;
 
   useEffect(() => {
-    let socket;
-    let tick;
+    let socket; let tick;
     (async () => {
       socket = await conectarSocket();
       socketRef.current = socket;
+      socket.emit('join_subasta', { id_subasta: idSubasta });
 
-      socket.emit('join_subasta', { id_subasta: idSubasta, id_pieza: pieza.id_pieza });
-
-      socket.on('sala_unida', () => setEstado('🔴 EN VIVO'));
-      socket.on('error_sala', (e) => {
-        Alert.alert('No se pudo entrar', e.motivo);
-        navigation.goBack();
+      socket.on('error_sala', (e) => { Alert.alert('No se pudo entrar', e.motivo); navigation.goBack(); });
+      socket.on('subasta_estado', ({ estado: est }) => {
+        setEstado(est === 'activa' ? 'en_curso' : est); // programada | finalizada
       });
 
-      socket.on('oferta_actualizada', (data) => {
-        if (String(data.id_pieza) === String(pieza.id_pieza)) {
-          setOfertaActual(data.nueva_oferta_lider);
+      const aplicarItem = (d) => {
+        setEstado('en_curso');
+        setItem(d);
+        setOferta(d.oferta_actual || 0);
+        setSoyLider(d.lider_id != null && String(d.lider_id) === String(miId));
+        setMonto('');
+        if (d.segundos_restantes != null) {
+          cierreTsRef.current = Date.now() + d.segundos_restantes * 1000;
+          setSegundos(d.segundos_restantes);
         }
-      });
+      };
+      socket.on('item_actual', aplicarItem);
 
-      socket.on('puja_confirmada', (data) => {
-        if (String(data.id_pieza) === String(pieza.id_pieza)) {
-          setSoyLider(true);
-          setPujando(false);
-          setMonto('');
-          setPujé(true);
-          pujéRef.current = true;
-        }
-      });
-
-      socket.on('puja_rechazada', (e) => {
-        setPujando(false);
-        Alert.alert('Puja rechazada', e.motivo);
-      });
-
-      // Reloj de cierre de ESTA pieza. Se ancla al reloj LOCAL usando
-      // segundos_restantes para evitar el desfasaje de reloj celular/servidor.
-      socket.on('subasta_timer', ({ id_pieza, cierra_ts, segundos_restantes }) => {
-        if (id_pieza != null && String(id_pieza) !== String(pieza.id_pieza)) return; // otra pieza
-        if (segundos_restantes != null) {
+      socket.on('item_timer', ({ id_pieza, segundos_restantes }) => {
+        if (itemRef.current && String(id_pieza) === String(itemRef.current.id_pieza) && segundos_restantes != null) {
           cierreTsRef.current = Date.now() + segundos_restantes * 1000;
           setSegundos(segundos_restantes);
-        } else if (cierra_ts) {
-          cierreTsRef.current = cierra_ts;
         }
       });
 
-      // Cerró ESTA pieza: se declara su ganador y se libera el bloqueo de salida.
-      const onPiezaCerrada = (d) => {
-        if (String(d.id_pieza) !== String(pieza.id_pieza)) return; // otra pieza de la subasta
-        setCerrada(true);
-        setSegundos(0);
-        const gané = pujéRef.current && soyLiderRef.current;
-        Alert.alert(
-          'Pieza finalizada',
-          gané ? '¡Ganaste la pieza! Pasá a ver la liquidación.' : 'La puja por esta pieza terminó.',
-        );
-      };
-      socket.on('pieza_cerrada', onPiezaCerrada);
-      // Fallback: si finaliza toda la subasta, también se desbloquea la salida.
-      socket.on('subasta_cerrada', () => { setCerrada(true); setSegundos(0); });
+      socket.on('oferta_actualizada', (d) => {
+        if (itemRef.current && String(d.id_pieza) === String(itemRef.current.id_pieza)) {
+          setOferta(d.nueva_oferta_lider);
+          setSoyLider(String(d.lider_id) === String(miId));
+        }
+      });
+
+      socket.on('puja_confirmada', () => { setPujando(false); setMonto(''); });
+      socket.on('puja_rechazada', (e) => { setPujando(false); Alert.alert('Puja rechazada', e.motivo); });
+
+      socket.on('item_cerrado', (d) => {
+        if (String(d.lider_id) === String(miId)) {
+          setGanados((g) => (g.find((x) => x.id_pieza === d.id_pieza) ? g : [...g, { id_pieza: d.id_pieza, titulo: d.titulo }]));
+        }
+      });
+
+      socket.on('subasta_finalizada', () => { setEstado('finalizada'); setItem(null); setSegundos(null); });
     })();
 
-    // Tick del countdown (1s).
     tick = setInterval(() => {
-      if (cierreTsRef.current) {
-        const s = Math.max(0, Math.round((cierreTsRef.current - Date.now()) / 1000));
-        setSegundos(s);
-      }
+      if (cierreTsRef.current) setSegundos(Math.max(0, Math.round((cierreTsRef.current - Date.now()) / 1000)));
     }, 1000);
 
     return () => {
       if (tick) clearInterval(tick);
       if (socket) {
         socket.emit('leave_subasta', { id_subasta: idSubasta });
-        socket.off('oferta_actualizada');
-        socket.off('puja_confirmada');
-        socket.off('puja_rechazada');
-        socket.off('sala_unida');
-        socket.off('error_sala');
-        socket.off('subasta_timer');
-        socket.off('pieza_cerrada');
-        socket.off('subasta_cerrada');
+        ['error_sala', 'subasta_estado', 'item_actual', 'item_timer', 'oferta_actualizada',
+          'puja_confirmada', 'puja_rechazada', 'item_cerrado', 'subasta_finalizada'].forEach((e) => socket.off(e));
       }
     };
   }, []);
 
-  // Mantiene una ref de soyLider para usar dentro del handler de cierre.
-  useEffect(() => { soyLiderRef.current = soyLider; }, [soyLider]);
-
-  // Bloqueo de salida: una vez que pujaste no podés salir hasta que termine.
-  useEffect(() => {
-    const sub = navigation.addListener('beforeRemove', (e) => {
-      if (pujéRef.current && !cerrada) {
-        e.preventDefault();
-        Alert.alert('No podés salir', 'Ya pujaste en esta subasta. Tenés que esperar a que termine.');
-      }
-    });
-    return sub;
-  }, [navigation, cerrada]);
-
   function pujar() {
     const valor = Number(monto);
+    if (!item) return;
     if (!valor) { Alert.alert('Monto inválido', 'Ingresá un monto a ofertar.'); return; }
-    if (valor < minimo) { Alert.alert('Muy bajo', `Mínimo: $${minimo.toFixed(0)}`); return; }
-    if (!exento && valor > maximo) { Alert.alert('Muy alto', `Máximo: $${maximo.toFixed(0)}`); return; }
-
+    if (valor < minimo) { Alert.alert('Muy bajo', `Mínimo: ${simbolo}${minimo.toFixed(0)}`); return; }
+    if (!exento && valor > maximo) { Alert.alert('Muy alto', `Máximo: ${simbolo}${maximo.toFixed(0)}`); return; }
     setPujando(true);
     socketRef.current.emit('nueva_puja', {
-      id_subasta: idSubasta,
-      id_pieza: pieza.id_pieza,
-      monto: valor,
-      id_medio_pago: medio?.id, // medio definido al iniciar la subasta (#18)
+      id_subasta: idSubasta, id_pieza: item.id_pieza, monto: valor, id_medio_pago: medio?.id,
     });
   }
 
-  async function verFactura() {
-    try {
-      const f = await PujaAPI.factura(pieza.id_pieza);
-      navigation.navigate('SubastaGanada', { factura: f, pieza, moneda: subasta.moneda });
-    } catch (e) {
-      Alert.alert('Aún no', e.message);
-    }
+  const BannerGanados = () => (ganados.length > 0 ? (
+    <Tarjeta style={styles.ganados}>
+      <Text style={styles.ganadosTit}>🏆 Ganaste {ganados.length} ítem{ganados.length > 1 ? 's' : ''}</Text>
+      <Text style={styles.ganadosTxt} numberOfLines={2}>{ganados.map((g) => g.titulo).join(' · ')}</Text>
+      <Boton title="PAGAR MIS COMPRAS" variant="dark" onPress={() => navigation.navigate('MisPujas')} />
+    </Tarjeta>
+  ) : null);
+
+  // --- Estados no "en curso" ---
+  if (estado === 'conectando') {
+    return <View style={styles.center}><ActivityIndicator size="large" color={colors.naranja} /><Text style={styles.msg}>Conectando a la sala…</Text></View>;
+  }
+  if (estado === 'programada') {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.emoji}>⏳</Text>
+        <Text style={styles.msgTit}>La subasta todavía no comenzó</Text>
+        <Text style={styles.msg}>Quedate en la sala: cuando arranque, vas a ver el ítem que se está rematando.</Text>
+        <Boton title="Salir" variant="secondary" onPress={() => navigation.goBack()} />
+      </View>
+    );
+  }
+  if (estado === 'finalizada') {
+    return (
+      <ScrollView contentContainerStyle={styles.center}>
+        <Text style={styles.emoji}>🏁</Text>
+        <Text style={styles.msgTit}>La subasta finalizó</Text>
+        <BannerGanados />
+        <Boton title="Volver al catálogo" onPress={() => navigation.navigate('Main')} />
+      </ScrollView>
+    );
   }
 
-  const simbolo = subasta.moneda === 'USD' ? 'US$' : '$';
-
+  // --- En curso: ítem actual ---
   return (
     <ScrollView style={styles.container}>
       <View style={styles.live}>
-        <Text style={styles.liveTxt}>{cerrada ? '⏹ FINALIZADA' : estado}: Subasta #{idSubasta}</Text>
-        {segundos != null && !cerrada && (
-          <Text style={styles.timer}>⏱ Cierra en {segundos}s</Text>
-        )}
+        <Text style={styles.liveTxt}>🔴 EN VIVO · Subasta #{idSubasta}</Text>
+        {segundos != null && <Text style={styles.timer}>⏱ {segundos}s</Text>}
       </View>
-      <View style={styles.stream}><Text style={styles.streamTxt}>▶ Streaming del Rematador</Text></View>
 
-      <View style={{ padding: 16 }}>
-        <Text style={styles.titulo}>{pieza.titulo}</Text>
-        <Text style={styles.meta}>Pieza #{pieza.nro_pieza} · Precio base: {simbolo}{base.toLocaleString()}</Text>
+      <BannerGanados />
 
-        {medio && (
-          <Text style={styles.medio}>
-            Medio de pago: {medio.tipo} {medio.numero} ✓ (saldo {simbolo}{Number(medio.saldo_disponible).toLocaleString()})
-          </Text>
-        )}
+      {item ? (
+        <View style={{ padding: 16 }}>
+          <Text style={styles.orden}>Ítem {item.orden} de {item.total}</Text>
+          {item.imagenes && item.imagenes[0]
+            ? <Image source={{ uri: item.imagenes[0] }} style={styles.img} />
+            : <View style={[styles.img, styles.ph]}><Text>Sin imagen</Text></View>}
+          <Text style={styles.titulo}>{item.titulo}</Text>
+          {item.artista ? <Text style={styles.meta}>{item.artista}</Text> : null}
+          <Text style={styles.meta}>Pieza #{item.nro_pieza} · Base: {simbolo}{Number(base).toLocaleString()}</Text>
 
-        <Tarjeta style={{ alignItems: 'center' }}>
-          <Text style={styles.lbl}>Mejor oferta actual:</Text>
-          <Text style={styles.oferta}>{simbolo}{Number(ofertaActual).toLocaleString()}</Text>
-          {soyLider && <Text style={styles.lider}>{cerrada ? '¡Ganaste!' : '¡Sos el mejor postor!'}</Text>}
+          <Tarjeta style={{ alignItems: 'center', marginTop: 12 }}>
+            <Text style={styles.lbl}>Mejor oferta actual</Text>
+            <Text style={styles.oferta}>{simbolo}{Number(oferta || base).toLocaleString()}</Text>
+            {soyLider && <Text style={styles.lider}>Vas ganando este ítem 🎯</Text>}
+            <TextInput style={styles.input} keyboardType="numeric"
+              placeholder={`${simbolo}${minimo.toFixed(0)}`} value={monto} onChangeText={setMonto} />
+            <Text style={styles.rango}>
+              Mín {simbolo}{minimo.toFixed(0)}{exento ? ' · sin tope (oro/platino)' : ` · Máx ${simbolo}${maximo.toFixed(0)}`}
+            </Text>
+          </Tarjeta>
 
-          {!cerrada && (
-            <>
-              <TextInput
-                style={styles.input}
-                keyboardType="numeric"
-                placeholder={`${simbolo}${minimo.toFixed(0)}`}
-                value={monto}
-                onChangeText={setMonto}
-              />
-              <Text style={styles.rango}>
-                Mín: +1% ({simbolo}{minimo.toFixed(0)})
-                {exento ? '  ·  Sin tope (oro/platino)' : `  ·  Máx: +20% (${simbolo}${maximo.toFixed(0)})`}
-              </Text>
-            </>
-          )}
-        </Tarjeta>
-
-        {!cerrada && (
-          <Boton title={pujando ? 'ESPERANDO CONFIRMACIÓN...' : 'PUJAR AHORA'}
-            onPress={pujar} loading={pujando} />
-        )}
-
-        {pujé && !cerrada && (
-          <Text style={styles.aviso}>🔒 Ya pujaste: no podés salir ni entrar a otra subasta hasta que esta termine.</Text>
-        )}
-
-        {/* La liquidación/pago solo cuando la subasta CERRÓ y resultaste ganador. */}
-        {cerrada && soyLider && (
-          <Boton title="VER LIQUIDACIÓN Y PAGAR" variant="dark" onPress={verFactura} />
-        )}
-        {!cerrada && soyLider && (
-          <Text style={styles.aviso}>Vas ganando. Cuando cierre la subasta vas a poder pagar la pieza.</Text>
-        )}
-
-        {(cerrada || !pujé) && (
-          <Boton title="SALIR DE LA SUBASTA" variant="secondary" onPress={() => navigation.goBack()} />
-        )}
-      </View>
+          <Boton title={pujando ? 'ESPERANDO CONFIRMACIÓN…' : 'PUJAR AHORA'} onPress={pujar} loading={pujando} />
+          <Boton title="Salir de la sala" variant="secondary" onPress={() => navigation.goBack()} />
+          <Text style={styles.nota}>Cuando cierre este ítem, sigue el próximo automáticamente.</Text>
+        </View>
+      ) : (
+        <View style={styles.center}><ActivityIndicator color={colors.naranja} /><Text style={styles.msg}>Preparando el próximo ítem…</Text></View>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
+  center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: colors.grisPerla },
+  emoji: { fontSize: 56, marginBottom: 10 },
+  msgTit: { fontSize: 18, fontWeight: '800', color: colors.azulMarino, textAlign: 'center', marginBottom: 6 },
+  msg: { color: colors.grisTexto, textAlign: 'center', marginTop: 6, marginBottom: 16, lineHeight: 20 },
   live: { backgroundColor: colors.azulMarino, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   liveTxt: { color: colors.blanco, fontWeight: '800' },
-  timer: { color: colors.dorado, fontWeight: '800' },
-  stream: { backgroundColor: '#000', height: 150, alignItems: 'center', justifyContent: 'center' },
-  streamTxt: { color: colors.blanco },
-  titulo: { fontSize: 19, fontWeight: '800', color: colors.azulMarino },
-  meta: { color: colors.grisTexto, marginBottom: 6 },
-  medio: { color: colors.azulMarino, fontWeight: '600', fontSize: 12.5, marginBottom: 4 },
+  timer: { color: colors.dorado, fontWeight: '900', fontSize: 16 },
+  orden: { color: colors.naranja, fontWeight: '800', marginBottom: 8 },
+  img: { width: '100%', height: 200, borderRadius: 12, backgroundColor: colors.grisBorde },
+  ph: { alignItems: 'center', justifyContent: 'center' },
+  titulo: { fontSize: 20, fontWeight: '800', color: colors.azulMarino, marginTop: 10 },
+  meta: { color: colors.grisTexto, marginTop: 2 },
   lbl: { color: colors.grisTexto, fontWeight: '600' },
   oferta: { fontSize: 30, fontWeight: '900', color: colors.verde, marginVertical: 4 },
   lider: { color: colors.verde, fontWeight: '700', marginBottom: 6 },
-  input: {
-    borderWidth: 1, borderColor: colors.grisBorde, borderRadius: 10, width: '100%',
-    padding: 12, textAlign: 'center', fontSize: 18, marginTop: 10, backgroundColor: '#fff',
-  },
+  input: { borderWidth: 1, borderColor: colors.grisBorde, borderRadius: 10, width: '100%', padding: 12, textAlign: 'center', fontSize: 18, marginTop: 10, backgroundColor: '#fff' },
   rango: { color: colors.grisTexto, fontSize: 12, marginTop: 8, textAlign: 'center' },
-  aviso: { color: '#92400E', backgroundColor: '#FEF3C7', padding: 10, borderRadius: 8, fontSize: 12.5, marginTop: 6, textAlign: 'center' },
+  nota: { color: colors.grisTexto, fontSize: 12, textAlign: 'center', marginTop: 8 },
+  ganados: { margin: 14, marginBottom: 0, borderColor: colors.verde, borderWidth: 1 },
+  ganadosTit: { color: colors.verde, fontWeight: '800', fontSize: 15 },
+  ganadosTxt: { color: colors.textoOscuro, fontSize: 13, marginTop: 2, marginBottom: 4 },
 });

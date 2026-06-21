@@ -20,6 +20,9 @@ async function migrarColumnasNuevas() {
     usuarios: {
       codigo_reset: { type: DataTypes.STRING, allowNull: true },
     },
+    subastas: {
+      pieza_actual_id: { type: DataTypes.INTEGER, allowNull: true },
+    },
     medios_pago: {
       marca: { type: DataTypes.STRING, allowNull: true },
       titular: { type: DataTypes.STRING, allowNull: true },

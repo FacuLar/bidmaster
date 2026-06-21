@@ -73,10 +73,16 @@ export default function HomeScreen({ navigation }) {
           {item.imagenes && item.imagenes[0]
             ? <Image source={{ uri: item.imagenes[0] }} style={styles.img} />
             : <View style={[styles.img, styles.imgPlaceholder]}><Text style={styles.imgTxt}>🖼️ Imagen del Artículo</Text></View>}
-          <View style={styles.envivo}>
-            <View style={styles.envivoDot} />
-            <Text style={styles.envivoTxt}>EN VIVO</Text>
-          </View>
+          {item.subasta.en_curso ? (
+            <View style={styles.envivo}>
+              <View style={styles.envivoDot} />
+              <Text style={styles.envivoTxt}>EN VIVO</Text>
+            </View>
+          ) : (
+            <View style={styles.programada}>
+              <Text style={styles.programadaTxt}>⏳ PROGRAMADA</Text>
+            </View>
+          )}
           {!accesible && (
             <View style={styles.lockBadge}><Text style={styles.lockTxt}>🔒 Categoría superior</Text></View>
           )}
@@ -162,6 +168,8 @@ const styles = StyleSheet.create({
   },
   envivoDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.rojo, marginRight: 6 },
   envivoTxt: { color: colors.blanco, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  programada: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(212,175,55,0.92)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999 },
+  programadaTxt: { color: colors.azulMarino, fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   lockBadge: {
     position: 'absolute', top: 10, right: 10,
     backgroundColor: 'rgba(17,24,39,0.82)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999,

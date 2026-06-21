@@ -18,6 +18,8 @@ const Subasta = sequelize.define('Subasta', {
     type: DataTypes.ENUM('programada', 'activa', 'finalizada'),
     defaultValue: 'activa',
   },
+  // Pieza que se está rematando AHORA (modelo secuencial: un ítem por vez).
+  pieza_actual_id: { type: DataTypes.INTEGER, allowNull: true },
   // Si es una colección de un mismo vendedor.
   es_coleccion: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, {

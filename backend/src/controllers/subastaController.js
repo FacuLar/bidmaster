@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { Subasta, Pieza, MedioPago, Usuario } = require('../models');
 const { AppError, asyncHandler } = require('../middleware/errorHandler');
 const { puedeAcceder } = require('../services/categoriaService');
@@ -5,7 +6,8 @@ const { subastaComprometida } = require('../services/pujaService');
 
 /* 3.1 Listar Subastas Activas (Home) — GET /subastas?moneda=&categoria= */
 const listarSubastas = asyncHandler(async (req, res) => {
-  const where = { estado: 'activa' };
+  // Se muestran las programadas (todavía no arrancaron) y las activas (en curso).
+  const where = { estado: { [Op.in]: ['programada', 'activa'] } };
   if (req.query.moneda) where.moneda = req.query.moneda; // ARS / USD
 
   const subastas = await Subasta.findAll({
@@ -23,6 +25,9 @@ const listarSubastas = asyncHandler(async (req, res) => {
     rematador: s.rematador,
     categoria_requerida: s.categoria_requerida,
     ubicacion: s.ubicacion,
+    estado: s.estado,                 // programada | activa
+    en_curso: s.estado === 'activa',
+    pieza_actual_id: s.pieza_actual_id,
     cantidad_piezas: s.piezas ? s.piezas.length : 0,
     // El usuario logueado sabe si puede o no acceder.
     accesible: req.usuario ? puedeAcceder(req.usuario.categoria, s.categoria_requerida) : null,
@@ -70,6 +75,11 @@ const catalogo = asyncHandler(async (req, res) => {
 const streaming = asyncHandler(async (req, res) => {
   const subasta = await Subasta.findByPk(req.params.id);
   if (!subasta) throw new AppError('Subasta inexistente', 404);
+
+  // No se puede entrar a una subasta ya finalizada.
+  if (subasta.estado === 'finalizada') {
+    throw new AppError('La subasta ya finalizó', 400);
+  }
 
   // Cuenta suspendida (multa impaga): no accede a los servicios.
   if (req.usuario.estado === 'suspendido') {
@@ -138,4 +148,18 @@ const streaming = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { listarSubastas, catalogo, streaming };
+/* ADMIN — Comenzar una subasta (arranca el remate secuencial ítem por ítem).
+   POST /admin/subastas/:id/comenzar  (header x-admin-key) */
+const adminComenzarSubasta = asyncHandler(async (req, res) => {
+  const engine = req.app.get('subastaEngine');
+  if (!engine) throw new AppError('Motor de subastas no disponible', 503);
+  const r = await engine.arrancar(req.params.id);
+  if (!r.ok) throw new AppError(r.motivo, 400);
+  res.status(200).json({
+    mensaje: 'Subasta iniciada. Se remata ítem por ítem.',
+    id_subasta: Number(req.params.id),
+    total_items: r.total_items,
+  });
+});
+
+module.exports = { listarSubastas, catalogo, streaming, adminComenzarSubasta };
