@@ -2,245 +2,223 @@
 
 Trabajo Práctico Obligatorio — **Desarrollo de Aplicaciones 1 (1C 2026)** — Grupo 12.
 
-Aplicación móvil para participar online en subastas dinámicas ascendentes y proponer
-artículos propios a remate. Implementa íntegramente la lógica de negocio, la API REST
-y la trazabilidad de diseño definidas en la Primera Entrega.
+Aplicación móvil para participar online en **subastas dinámicas ascendentes** (un ítem por
+vez, en tiempo real) y proponer artículos propios a remate. Implementa la lógica de negocio,
+la API REST + WebSockets y la trazabilidad de diseño definidas en la Primera Entrega.
 
 ---
 
-## 1. Arquitectura del proyecto
+## 1. Arquitectura
 
 ```
-                          ┌──────────────────────────────┐
-                          │   App móvil  (React Native)   │
-                          │        Expo + RN              │
-                          │  - Navegación (stack/tabs)    │
-                          │  - Context de Auth (JWT)      │
-                          │  - Cliente REST (axios)        │
-                          │  - Cliente Realtime (socket.io)│
-                          └───────────────┬──────────────┘
-                                          │
-                  HTTPS (REST)            │           WS (Socket.IO)
-                  /api/v1/...             │           sala por subasta
-                                          ▼
-                          ┌──────────────────────────────┐
-                          │   Backend  (Node.js + Express) │
-                          │  - Rutas → Controladores       │
-                          │  - Middleware JWT / errores    │
-                          │  - Servicios (lógica negocio)  │
-                          │  - Socket.IO (motor de pujas)  │
-                          └───────────────┬──────────────┘
-                                          │ Sequelize ORM
-                                          ▼
-                          ┌──────────────────────────────┐
-                          │      Base de datos SQLite      │
-                          │  (portable; swap a Postgres)   │
-                          └──────────────────────────────┘
+   App móvil (React Native / Expo)        Backend (Node.js + Express)        SQLite
+   - Navegación stack + tabs               - routes → controllers → services   (Sequelize ORM,
+   - Context de Auth (JWT)        REST     - middleware JWT / x-admin-key       swap a Postgres
+   - axios (REST)             ──────────►  - Socket.IO: motor SECUENCIAL        con DATABASE_URL)
+   - socket.io-client (vivo)  ◄─ WS ─────    de subastas (1 ítem por vez)
 ```
 
-**Backend** — `Node.js + Express` (REST) + `Socket.IO` (tiempo real) + `Sequelize` + `SQLite`.
-Arquitectura en capas: `routes → controllers → services → models`.
-
-**Frontend** — `React Native (Expo)` con `React Navigation`, `axios` y `socket.io-client`.
-Paleta y componentes respetan el concepto **"Trust & Action"** de la Primera Entrega.
-
-### Capas del backend
-
-| Capa          | Responsabilidad                                                            |
-|---------------|----------------------------------------------------------------------------|
-| `routes`      | Define endpoints REST y aplica middleware (auth).                          |
-| `controllers` | Traduce HTTP ↔ servicios. Valida forma del request, arma respuestas.      |
-| `services`    | Lógica de negocio pura (validación de pujas, categorías, liquidación).    |
-| `models`      | Entidades Sequelize y relaciones.                                         |
-| `sockets`     | Motor de pujas en tiempo real (salas por subasta, broadcast de líder).    |
-| `middleware`  | `auth` (JWT), `errorHandler` (respuestas de error homogéneas).            |
+Capas del backend: `routes → controllers → services → models`, más `sockets` (motor de
+subastas en vivo) y `middleware` (`auth` JWT, `requireAdmin` por `x-admin-key`, `errorHandler`).
 
 ---
 
-## 2. Esquema de base de datos
+## 2. Modelo de subasta (SECUENCIAL)
 
-```
-Usuario ──< MedioPago
-Usuario ──< Puja >── Pieza >── Subasta
-Usuario ──< Venta >── Pieza
-Usuario ──< Multa
-Usuario ──< Articulo            (bienes que el usuario propone a remate)
-Pieza   ──> Usuario (dueno)
-SolicitudRegistro (etapa 1, previa al Usuario)
-```
+Cada subasta tiene un **catálogo ordenado** y remata **un ítem por vez**:
 
-### Tablas
+1. Las subastas arrancan **`programada`** (no corriendo).
+2. Un administrador la **inicia** (`POST /admin/subastas/:id/comenzar`, por Postman).
+3. Se remata el ítem 1 durante `DURACION_ITEM_MS` (default 30s). **Anti-sniping**: si alguien
+   puja faltando < 15s, el reloj se estira.
+4. Al cerrar, **gana el último postor** (o la empresa compra al precio base si no hubo ofertas)
+   y **avanza solo al siguiente ítem**.
+5. La subasta termina (`finalizada`) cuando no quedan ítems abiertos.
 
-**Usuario**
-| campo | tipo | notas |
-|---|---|---|
-| id | INT PK | |
-| nombre, apellido | STRING | |
-| email | STRING UNIQUE | |
-| password_hash | STRING | bcrypt (etapa 2) |
-| dni_frente, dni_dorso | STRING | URL/Base64 |
-| domicilio_legal, pais_origen | STRING | |
-| categoria | ENUM | comun, especial, plata, oro, platino |
-| estado | ENUM | activo, suspendido |
-| cuenta_cobro | STRING | cuenta a la vista para liquidaciones (puede ser del exterior) |
-
-**SolicitudRegistro** (verificación externa en 2 etapas)
-| id_solicitud (UUID PK) · nombre · apellido · email · dni_frente · dni_dorso · domicilio_legal · pais_origen · estado (pendiente/aprobada/rechazada) · categoria_asignada |
-
-**MedioPago**
-| id PK · usuario_id FK · tipo (CUENTA/TARJETA/CHEQUE) · entidad · numero_identificador · monto_certificado · saldo_disponible · estado_verificacion (Pendiente/Verificado) |
-
-**Subasta**
-| id PK · titulo · fecha · hora · moneda (ARS/USD) · categoria_requerida · rematador · ubicacion · url_stream · estado (programada/activa/finalizada) |
-
-**Pieza**
-| id PK · subasta_id FK · nro_pieza · titulo · descripcion · precio_base · dueno_id FK · imagenes (JSON, ~6) · artista · fecha_obra · historia · oferta_actual · lider_id FK · estado (en_subasta/vendida/sin_ofertas) |
-
-**Puja**
-| id PK · subasta_id FK · pieza_id FK · usuario_id FK · monto · orden (secuencial por pieza) · createdAt |
-
-**Venta**
-| id PK · pieza_id FK · usuario_id FK · medio_pago_id FK · monto_pujado · comision (10%) · costo_envio · total · retiro_personal (bool) · createdAt |
-
-**Multa**
-| id PK · usuario_id FK · monto (10% ofertado) · fecha_limite (+72hs) · estado (con_deuda/pagada) |
-
-**Articulo** (inclusión de bienes — Módulo 5)
-| id_tramite PK · usuario_id FK · titulo · descripcion · historia · fotos (JSON, min 6) · acepta_devolucion · declaracion_jurada_licita · acredita_origen · estado (En revisión/Aceptado/Rechazado/Programado) · valor_base_sugerido · comisiones · fecha_subasta · ubicacion_deposito · seguro_compania · seguro_cobertura · motivo_rechazo |
+El usuario entra a la sala, ve el ítem que se remata **ahora** y puede entrar/salir cuando
+quiera (esperar el ítem que le interesa). Las ofertas se reciben en tiempo real.
 
 ---
 
-## 3. Especificación de la API REST (trazabilidad con Primera Entrega)
+## 3. Esquema de base de datos (campos clave)
 
-Base URL: `/api/v1`
+```
+Usuario ──< MedioPago        Usuario ──< Puja >── Pieza >── Subasta
+Usuario ──< Venta >── Pieza   Usuario ──< Multa   Usuario ──< Articulo ──> Pieza (al aceptar)
+SolicitudRegistro (registro etapa 1, previa al Usuario)
+```
 
-### Módulo 1 — Autenticación y Usuarios
-| Método | Endpoint | Descripción |
-|---|---|---|
-| POST | `/auth/login` | Login directo → token JWT |
-| POST | `/auth/registro-etapa1` | Datos + DNI → verificación externa (202) |
-| POST | `/auth/registro-etapa2` | Genera clave personal tras aprobación (201) |
-| POST | `/auth/recuperar-password` | **(corrección)** "Se me olvidó la contraseña" |
-| GET  | `/usuarios/perfil/metricas` | Métricas del perfil 🔒 |
-| GET  | `/usuarios/multas` | Multas activas (10% / 72hs) 🔒 |
+- **Usuario**: `categoria` (comun/especial/plata/oro/platino), `estado` (activo/suspendido),
+  `codigo_reset` (recuperar clave), `cuenta_cobro`.
+- **SolicitudRegistro**: datos + DNI + `estado` (pendiente/aprobada/rechazada),
+  `categoria_asignada`, `codigo_validacion`.
+- **MedioPago**: `tipo` (CUENTA/TARJETA/CHEQUE), `marca`/`titular`/`vencimiento` (tarjeta),
+  `numero_cheque`/`banco`/`cbu` (cheque), `saldo_disponible`, `estado_verificacion`
+  (Pendiente/Verificado/Rechazado). *El número de tarjeta se guarda enmascarado y el CVV no se persiste.*
+- **Subasta**: `moneda` (ARS/USD), `categoria_requerida`, `estado` (programada/activa/finalizada),
+  `pieza_actual_id` (ítem en remate).
+- **Pieza**: `precio_base`, `imagenes` (~6), `oferta_actual`, `lider_id`, `dueno_id`,
+  `estado` (en_subasta/vendida/sin_ofertas), **`categoria` / `tags` / `uso`** (búsqueda y filtros).
+- **Venta**: `monto_pujado`, `comision` (10%), `costo_envio`, `total`, `estado_pago` (pendiente/pagada).
+- **Multa**: `monto` (10% ofertado), `fecha_limite` (+72hs), `estado` (con_deuda/pagada).
+- **Articulo** (bienes propuestos): estado del trámite, tasación, logística/seguro, y
+  **`pieza_id`** (la pieza generada al aceptar, que se incluye en una subasta).
 
-### Módulo 2 — Billetera y Medios de Pago
-| POST | `/pagos/medios` | Registrar medio de pago 🔒 |
-| GET  | `/pagos/medios` | Listar mis medios de pago 🔒 |
-| GET  | `/pagos/medios/{id}/estado` | Estado de verificación 🔒 |
+El esquema se sincroniza con `sequelize.sync()` + una migración aditiva (ADD COLUMN) en el arranque.
+
+---
+
+## 4. API REST — `/api/v1`
+
+**Acceso:** 🔓 público · 🔑 token de usuario (`Authorization: Bearer <token>`) · 🛡️ admin (`x-admin-key`).
+
+### Módulo 1 — Autenticación / Cuenta
+| 🔐 | Método | Endpoint | Descripción |
+|---|---|---|---|
+| 🔓 | POST | `/auth/login` | Login → token JWT |
+| 🔓 | POST | `/auth/registro-etapa1` | Datos + DNI → solicitud pendiente (202) |
+| 🔓 | GET | `/auth/solicitudes/{id}/estado` | Estado de la solicitud (y código si aprobada) |
+| 🔓 | POST | `/auth/registro-etapa2` | Activa la cuenta con el código (genera clave) |
+| 🔓 | POST | `/auth/reanudar-registro` | Retoma la validación por email |
+| 🔓 | POST | `/auth/recuperar-password` | Pide código de recuperación |
+| 🔓 | POST | `/auth/resetear-password` | Setea nueva clave con el código |
+| 🔑 | GET | `/usuarios/perfil/metricas` | Métricas del perfil |
+| 🔑 | GET | `/usuarios/multas` | Multa activa |
+| 🔑 | POST | `/usuarios/multas/pagar` | Paga la multa y reactiva la cuenta |
+
+### Módulo 2 — Billetera
+| 🔑 | POST | `/pagos/medios` | Registrar medio (queda Pendiente) |
+| 🔑 | GET | `/pagos/medios` | Listar mis medios |
+| 🔑 | GET | `/pagos/medios/{id}/estado` | Estado de un medio |
+| 🔑 | DELETE | `/pagos/medios/{id}` | Eliminar un medio |
 
 ### Módulo 3 — Catálogo y Subastas
-| GET | `/subastas` | Listar subastas activas (query: moneda, categoria) |
-| GET | `/subastas/{id}/catalogo` | Detalle de piezas (oculta precio si no logueado) |
-| GET | `/subastas/{id}/streaming` | Valida categoría + medio verificado → URL stream 🔒 |
+| 🔓 | GET | `/subastas?moneda=ARS` | Subastas programadas + en curso |
+| 🔓 | GET | `/subastas/{id}/catalogo` | Piezas (con categoría/tags/uso) |
+| 🔑 | GET | `/subastas/{id}/streaming?id_medio=&id_pieza=` | Valida ingreso + medio + fondos |
 
-### Módulo 4 — Motor de Pujas y Facturación
-| POST | `/pujas` | Realizar puja (validaciones 1%–20%, saldo) 🔒 |
-| GET  | `/ventas/{id_pieza}/factura` | Liquidación del ganador 🔒 |
-| POST | `/ventas/{id_pieza}/pagar` | Pagar la pieza; si no hay fondos → multa 10% 🔒 |
+### Módulo 4 — Pujas y Pago
+| 🔑 | POST | `/pujas` | Pujar (en vivo va por WebSocket) |
+| 🔑 | GET | `/ventas/{id_pieza}/factura` | Liquidación del ganador |
+| 🔑 | POST | `/ventas/{id_pieza}/pagar` | Pagar la pieza; sin fondos → multa 10% |
 
-### Módulo 5 — Inclusión de Bienes (Vendedores)
-| GET   | `/vendedores/articulos` | Listar mis artículos 🔒 |
-| POST  | `/vendedores/articulos` | Proponer pieza (min 6 fotos + DDJJ) 🔒 |
-| PATCH | `/vendedores/articulos/{id}/condiciones` | Aceptar/Rechazar tasación 🔒 |
-| GET   | `/vendedores/articulos/{id}/logistica` | Depósito + póliza de seguro 🔒 |
+### Módulo 5 — Vendedor (inclusión de bienes)
+| 🔑 | GET | `/vendedores/articulos` | Mis artículos |
+| 🔑 | POST | `/vendedores/articulos` | Proponer bien (min 6 fotos + DDJJ) |
+| 🔑 | PATCH | `/vendedores/articulos/{id}/inspeccion` | ENVIAR / CANCELAR |
+| 🔑 | PATCH | `/vendedores/articulos/{id}/condiciones` | ACEPTAR (crea la pieza) / RECHAZAR |
+| 🔑 | PATCH | `/vendedores/articulos/{id}/devolucion` | RETIRO / ENVIO (descuenta el flete) |
+| 🔑 | GET | `/vendedores/articulos/{id}/factura-flete` | Factura del flete |
+| 🔑 | GET | `/vendedores/articulos/{id}/logistica` | Depósito + póliza |
 
-🔒 = requiere header `Authorization: Bearer <token>`.
+### Administración — **sólo por Postman** (`x-admin-key`)
+| 🛡️ | GET | `/admin/solicitudes?estado=pendiente` | Ver registros pendientes |
+| 🛡️ | PATCH | `/admin/solicitudes/{id}/resolver` | **Aprobar cuenta + dar categoría** (devuelve el código) |
+| 🛡️ | GET | `/admin/pagos/medios?estado=Pendiente` | Ver medios pendientes |
+| 🛡️ | PATCH | `/admin/pagos/medios/{id}/verificar` | **Verificar un medio de pago** |
+| 🛡️ | POST | `/admin/subastas/{id}/comenzar` | **Comenzar el remate secuencial** |
 
-### WebSocket (Socket.IO) — Motor de pujas en tiempo real
-- `join_subasta { id_subasta }` → entra a la sala (1 sala por usuario máx.).
-- `nueva_puja { id_subasta, id_pieza, monto }` → valida y persiste; el server confirma
-  con `puja_confirmada` SOLO al emisor y recién entonces el cliente habilita otra puja.
-- `oferta_actualizada { id_pieza, nueva_oferta_lider, lider_id }` → broadcast a la sala.
-- `puja_rechazada { motivo }` → al emisor si viola reglas.
+### WebSocket (Socket.IO) — motor en vivo
+- Cliente → `join_subasta {id_subasta}`, `nueva_puja {id_subasta, id_pieza, monto, id_medio_pago}`.
+- Servidor → `item_actual` (ítem que se remata), `item_timer` (reloj), `oferta_actualizada`,
+  `puja_confirmada` (sólo al emisor), `puja_rechazada`, `item_cerrado`, `subasta_finalizada`.
 
----
-
-## 4. Reglas de negocio implementadas
-
-- **Registro en 2 etapas** con verificación externa y asignación de categoría.
-- **Categorías**: `comun < especial < plata < oro < platino`. Sólo se accede a subastas
-  cuya categoría requerida sea ≤ a la del usuario.
-- **Acceso a pujar**: requiere ≥ 1 medio de pago **verificado**. Sin él, sólo ve la subasta.
-- **Validación de puja**:
-  - `monto ≥ oferta_actual + 1% · precio_base`
-  - `monto ≤ oferta_actual + 20% · precio_base` (excepto **oro/platino**)
-  - Si paga con **cheque certificado**: suma de compras ≤ `monto_certificado`.
-- **Una sola sala a la vez** por usuario.
-- **Confirmación secuencial**: no se admite otra puja hasta confirmar la anterior.
-- **Cierre**: cuando nadie supera, el último postor es el nuevo dueño → se registra venta,
-  comisión 10%, costo de envío, y se notifica el total a pagar.
-- **Sin ofertas**: la empresa compra la pieza al precio base.
-- **Multa**: si no puede pagar, 10% del valor ofertado + 72hs para regularizar; cuenta
-  suspendida para nuevas pujas hasta abonar.
-- **Monedas**: ARS o USD por subasta (no bimonetaria).
-- **Inclusión de bienes**: DDJJ de pertenencia, acreditación de origen lícito, min 6 fotos,
-  tasación con valor base/comisiones que el vendedor acepta o rechaza, depósito y seguro.
+> 📮 **Colección de Postman lista para importar**: `backend/BidMaster.postman_collection.json`
+> (todos los endpoints, variables y un script que guarda el token al hacer login).
+> Detalle del flujo de aprobación en `backend/POSTMAN-ADMIN.md`.
 
 ---
 
-## 5. Cómo ejecutar
+## 5. Reglas de negocio y validaciones
+
+**Registro y aprobación (manual):**
+- Registro en 2 etapas. La cuenta **no se aprueba sola**: un administrador la aprueba y le
+  asigna categoría por Postman; recién entonces el usuario genera su clave.
+- Validaciones "reales" en el alta: **email existente** (registros MX del dominio + typos +
+  bloqueo de descartables), **domicilio geocodificado** (OpenStreetMap), **país** válido,
+  **fotos de DNI** verificadas (magic bytes) y nombre sin números.
+
+**Medios de pago:** tarjeta (marca + Luhn + **CVV** + vencimiento), cheque (nro/banco/monto/CBU)
+y **CBU con dígito verificador real (BCRA)**. Quedan **Pendiente** hasta que un admin los verifique.
+
+**Subastas y pujas:**
+- Categorías `comun < especial < plata < oro < platino`; sólo se accede a subastas de categoría ≤ a la propia.
+- Para pujar hace falta ≥ 1 medio **verificado** en la moneda de la subasta; y no entrar con un
+  medio que no cubra el precio base.
+- `oferta + 1%·base ≤ puja ≤ oferta + 20%·base` (sin tope superior en oro/platino).
+- **Una subasta a la vez** + confirmación secuencial (no se admite otra puja sin confirmar la anterior).
+- No se puede **pujar por el propio bien**.
+- Cierre por ítem → gana el último; sin ofertas → la empresa compra al base. Comisión 10% + envío.
+- **Multa**: sin fondos al pagar → 10% del valor ofertado + 72hs; cuenta **suspendida**
+  (no puja, no entra, no paga) **hasta pagar la multa**.
+- Monedas ARS/USD por subasta (no bimonetaria).
+
+**Búsqueda y filtros del catálogo:** por texto (nombre/artista/etiqueta), **categoría**
+(arte/tecnología/moda/joyas/vehículos/hobbies), **etiquetas** (Lujo, Vintage, Colección, …) y
+**estado de uso** (nuevo/poco_uso/usado/sellado/restaurado).
+
+**Vendedor:** DDJJ de pertenencia + origen lícito + min 6 fotos → inspección → tasación. Al
+**aceptar**, el bien se vuelve una pieza real en la *"Subasta de la Comunidad"* y se puede
+rematar. Rechazo/devolución con **flete descontado** de la cuenta corriente.
+
+---
+
+## 6. Cómo ejecutar
 
 ### Backend
 ```bash
 cd backend
 npm install
-npm run seed         # crea la BD SQLite y carga datos de prueba
-npm run dev          # levanta API + WebSocket en http://localhost:4000
-
-# Verificación (opcional):
-npm run test:logica  # 11 asserts de la lógica de negocio (categorías, pujas 1%-20%, factura)
-npm run test:e2e     # 34 asserts E2E "como usuario" contra las consignas del TPO
-npm run test:ws      # 2 postores en tiempo real: confirmación, broadcast y rechazo
+cp .env.example .env     # opcional; trae defaults (ADMIN_KEY, toggles de verificación)
+npm run seed             # crea la BD SQLite y carga datos de prueba
+npm run dev              # API + WebSocket en http://localhost:4000  (nodemon)
 ```
-
-> **Estado de validación (probado end-to-end):**
-> - Seed OK · **11/11** tests de lógica · **34/34** tests E2E · WebSocket OK.
-> - E2E cubre: registro en 2 etapas, login/recuperar clave, catálogo (precio oculto/visible),
->   categoría que habilita acceso, puja 1%–20%, moneda ARS/USD, billetera, streaming,
->   factura (10% + envío), **pago con fondos insuficientes → multa 10% + suspensión**,
->   inclusión de bienes (6 fotos + DDJJ, tasación, logística/seguro) y seguridad (401/403).
+Variables útiles en `.env`: `ADMIN_KEY`, `DURACION_ITEM_MS`, `VERIFICAR_EMAIL`,
+`VERIFICAR_DOMICILIO` (poné estas dos en `false` para testear sin internet).
 
 ### Frontend
 ```bash
 cd frontend
 npm install
-# Editar src/config.js -> API_URL con la IP de tu PC si usás dispositivo físico
-npm start        # Expo: abrí en Expo Go (Android/iOS) o emulador
+# Si usás dispositivo físico: editar src/config.js → API_URL con la IP LAN de tu PC.
+npm start                # Expo: escaneá el QR con Expo Go (misma red Wi-Fi)
 ```
 
 ### Usuarios de prueba (tras `npm run seed`)
-| email | password | categoría |
-|---|---|---|
-| facundo@ejemplo.com | 123456 | plata |
-| oro@ejemplo.com | 123456 | oro |
-| nuevo@ejemplo.com | 123456 | comun |
+| email | password | categoría | medios |
+|---|---|---|---|
+| facundo@ejemplo.com | 123456 | plata | Visa ARS, Cuenta USD, Cheque ARS (verificados) |
+| oro@ejemplo.com | 123456 | oro | Cuenta USD |
+| nuevo@ejemplo.com | 123456 | comun | — |
+
+### Flujo de prueba (con Postman para lo de admin)
+1. Registrate en la app → entrás como **invitado**.
+2. Postman `GET /admin/solicitudes?estado=pendiente` → copiá el `id_solicitud`.
+3. Postman `PATCH /admin/solicitudes/{id}/resolver` con `{ "aprobar": true, "categoria": "oro" }`
+   → devuelve el **código**. Ponelo en la app para generar tu clave y activar la cuenta.
+4. Cargá un medio de pago → Postman `PATCH /admin/pagos/medios/{id}/verificar` → ya podés pujar.
+5. Postman `POST /admin/subastas/{id}/comenzar` → entrás a la sala y se remata ítem por ítem.
+
+Clave de admin por defecto: `x-admin-key: bidmaster_admin_2026`.
 
 ---
 
-## 6. Despliegue en línea (entrega final)
+## 7. Despliegue en línea
 
-- **Backend**: listo para Render / Railway / Fly.io. Usa `process.env.PORT` y
-  `DATABASE_URL` (si se define, usa Postgres; si no, SQLite local). Ver `backend/.env.example`.
-- **Frontend**: `expo build` / EAS Build para generar el APK instalable en dispositivo, o
-  Expo Go apuntando al backend desplegado (configurar `API_URL`).
+- **Backend**: usa `process.env.PORT` y `DATABASE_URL` (si existe → Postgres; si no → SQLite).
+  Listo para Render / Railway / Fly.io (ver `backend/.env.example`, `render.yaml`, `Procfile`).
+- **Frontend**: EAS Build para el APK instalable, o Expo Go apuntando al backend desplegado
+  (configurar `API_URL`).
 
 ---
 
-## 7. Correcciones de diseño aplicadas (sobre el wireframe original)
-1. Campo **"Mail"** agregado en la pantalla *Creá tu cuenta* (registro etapa 1).
-2. Botón **"¿Se me olvidó la contraseña?"** agregado en la pantalla *Iniciar Sesión*.
+## 8. Trazabilidad y correcciones de diseño
 
-### Correcciones de testing (2ª ronda)
-3. **Foto del DNI real**: el registro abre cámara/galería (`expo-image-picker`) y sube
-   la imagen (frente y dorso) en base64, con preview. Antes era un botón ficticio.
-4. **Validaciones de registro**: se valida formato de email y domicilio legal (calle +
-   número), tanto en el frontend como en el backend.
-5. **Aprobación real en 2 etapas**: la etapa 2 está **bloqueada hasta que la verificación
-   externa apruebe** la solicitud (ya no se aprueba al instante). Nuevo endpoint
-   `GET /auth/solicitudes/{id}/estado` que la app consulta hasta la aprobación. La
-   verificación se simula de forma diferida (`VERIFICACION_SEGUNDOS`, default 8s) sin
-   necesidad de Postman.
-6. **Cambio de subasta ("una a la vez")**: el usuario puede salir de una subasta y entrar
-   a otra cuando quiera (nunca queda conectado a dos a la vez). Se agregó botón *Salir de
-   la subasta* y el backend libera el lock anterior al cambiar (antes quedaba "pegado").
+- Correcciones del wireframe: campo **"Mail"** en *Creá tu cuenta* y **"¿Olvidaste tu contraseña?"**
+  funcional (recuperación en 2 pasos con código).
+- Salida de la fase de prueba: **aprobaciones manuales por Postman** (registros y medios),
+  **validaciones reales** (email/domicilio/CBU/DNI), **modelo de subasta secuencial** acorde a la
+  consigna ("ver *qué artículo* se subasta"), búsqueda/filtros del catálogo, y cierre del circuito
+  **vendedor → pieza subastable**.
+- Una divergencia consciente respecto del enunciado: no aplica. El modelo es secuencial como pide
+  la consigna.
