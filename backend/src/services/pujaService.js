@@ -36,6 +36,11 @@ async function validarPuja({ usuario, pieza, subasta, monto, medioPagoId }) {
     return { ok: false, status: 403, motivo: 'Tenés una multa pendiente de pago' };
   }
 
+  // No se puede pujar por el propio bien.
+  if (pieza.dueno_id != null && String(pieza.dueno_id) === String(usuario.id)) {
+    return { ok: false, status: 403, motivo: 'No podés pujar por tu propio bien' };
+  }
+
   // Subasta y pieza vigentes.
   if (subasta.estado === 'finalizada') {
     return { ok: false, status: 400, motivo: 'La subasta ya finalizó' };

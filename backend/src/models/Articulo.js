@@ -35,6 +35,8 @@ const Articulo = sequelize.define('Articulo', {
   valor_base_sugerido: { type: DataTypes.FLOAT },
   comisiones: { type: DataTypes.FLOAT },          // % de comisión
   fecha_subasta: { type: DataTypes.DATEONLY },
+  // Pieza generada al aceptar la tasación (queda incluida en una subasta).
+  pieza_id: { type: DataTypes.INTEGER, allowNull: true },
   // Resultado de venta (lo único que ve el vendedor; sin historial de pujas #19).
   monto_venta: { type: DataTypes.FLOAT },
   // Logística y seguro una vez aceptado.

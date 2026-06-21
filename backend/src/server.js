@@ -28,6 +28,9 @@ async function migrarColumnasNuevas() {
       tags: { type: DataTypes.JSON, allowNull: true },
       uso: { type: DataTypes.STRING, allowNull: true },
     },
+    articulos: {
+      pieza_id: { type: DataTypes.INTEGER, allowNull: true },
+    },
     medios_pago: {
       marca: { type: DataTypes.STRING, allowNull: true },
       titular: { type: DataTypes.STRING, allowNull: true },

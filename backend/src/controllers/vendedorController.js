@@ -1,5 +1,25 @@
-const { Articulo, MedioPago } = require('../models');
+const { Articulo, MedioPago, Pieza, Subasta } = require('../models');
 const { AppError, asyncHandler } = require('../middleware/errorHandler');
+
+/**
+ * Devuelve (o crea) la subasta "programada" donde se incluyen los bienes que los
+ * usuarios proponen y la empresa acepta. Permite probar el circuito completo:
+ * un bien aceptado aparece en el catálogo y se puede rematar.
+ */
+async function obtenerSubastaComunidad() {
+  let subasta = await Subasta.findOne({
+    where: { titulo: 'Subasta de la Comunidad', estado: 'programada' },
+  });
+  if (!subasta) {
+    const en7dias = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    subasta = await Subasta.create({
+      titulo: 'Subasta de la Comunidad', fecha: en7dias, hora: '19:00',
+      moneda: 'ARS', categoria_requerida: 'comun', rematador: 'BidMaster',
+      ubicacion: 'Salón Comunidad', estado: 'programada',
+    });
+  }
+  return subasta;
+}
 
 const COSTO_FLETE_DEVOLUCION = 1500; // cargo de flete por devolución (#13)
 const COMISION_DEFAULT = 10;         // % de comisión de la empresa
@@ -220,9 +240,34 @@ const responderCondiciones = asyncHandler(async (req, res) => {
   }
 
   if (decision === 'ACEPTAR') {
+    // Al aceptar, el bien se incluye en una subasta real (programada) como pieza,
+    // así puede rematarse y probar todo el circuito vendedor -> comprador.
+    const subasta = await obtenerSubastaComunidad();
+    const maxNro = (await Pieza.max('nro_pieza', { where: { subasta_id: subasta.id } })) || 900;
+    const pieza = await Pieza.create({
+      nro_pieza: maxNro + 1,
+      titulo: articulo.titulo,
+      descripcion: articulo.descripcion,
+      historia: articulo.historia,
+      precio_base: articulo.valor_base_sugerido || 10000,
+      imagenes: Array.isArray(articulo.fotos) ? articulo.fotos : [],
+      subasta_id: subasta.id,
+      dueno_id: req.usuario.id,
+      estado: 'en_subasta',
+    });
+
     articulo.estado = 'Programado';
+    articulo.pieza_id = pieza.id;
+    articulo.fecha_subasta = subasta.fecha;
     await articulo.save();
-    return res.status(200).json({ estado: articulo.estado, mensaje: 'Condiciones aceptadas. Artículo programado para subasta.' });
+
+    return res.status(200).json({
+      estado: articulo.estado,
+      mensaje: `Aceptaste. Tu bien quedó incluido en "${subasta.titulo}" y ya se puede subastar.`,
+      id_subasta: subasta.id,
+      id_pieza: pieza.id,
+      fecha_subasta: subasta.fecha,
+    });
   }
   if (decision === 'RECHAZAR') {
     articulo.estado = 'Devuelto';
