@@ -25,6 +25,7 @@ router.post('/usuarios/multas/pagar', requireAuth, usuario.pagarMulta);
 router.post('/pagos/medios', requireAuth, pago.registrarMedio);
 router.get('/pagos/medios', requireAuth, pago.listarMedios);
 router.get('/pagos/medios/:id/estado', requireAuth, pago.estadoMedio);
+router.delete('/pagos/medios/:id', requireAuth, pago.eliminarMedio);
 
 /* --------------------- Módulo 3: Catálogo y Subastas --------------- */
 router.get('/subastas', optionalAuth, subasta.listarSubastas);

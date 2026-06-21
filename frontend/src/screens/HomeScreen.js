@@ -28,7 +28,10 @@ export default function HomeScreen({ navigation }) {
       const todas = [];
       for (const s of lista) {
         const cat = await SubastaAPI.catalogo(s.id_subasta);
-        cat.piezas.forEach((p) => todas.push({ ...p, subasta: s }));
+        // Solo se muestran piezas todavía en subasta (las vendidas/sin ofertas se ocultan).
+        cat.piezas
+          .filter((p) => p.estado === 'en_subasta')
+          .forEach((p) => todas.push({ ...p, subasta: s }));
       }
       setPiezas(todas);
     } catch (e) {

@@ -9,6 +9,20 @@ import { PagoAPI } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
 
+// Formatea el número de tarjeta en grupos de 4 dígitos (máx 19 dígitos).
+const formatTarjeta = (v) => v.replace(/\D/g, '').slice(0, 19).replace(/(.{4})/g, '$1 ').trim();
+// Formatea el vencimiento como MM/AA y no deja meses > 12.
+const formatVenc = (v) => {
+  let d = v.replace(/\D/g, '').slice(0, 4);
+  if (d.length >= 1 && Number(d[0]) > 1) d = `0${d}`.slice(0, 4); // 3 -> 03
+  if (d.length >= 2) {
+    let mes = Math.min(12, Math.max(1, Number(d.slice(0, 2)) || 1));
+    d = String(mes).padStart(2, '0') + d.slice(2);
+    return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+  }
+  return d;
+};
+
 // Estado inicial del formulario (incluye los campos de tarjeta y cheque).
 const FORM_VACIO = {
   tipo: 'TARJETA', entidad: '', moneda: 'ARS',
@@ -106,6 +120,20 @@ export default function BilleteraScreen({ navigation }) {
     </View>
   );
 
+  function eliminar(item) {
+    Alert.alert('Eliminar medio de pago', `¿Borrar ${item.tipo} · ${item.entidad}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          try { await PagoAPI.eliminar(item.id); cargar(); }
+          catch (e) { Alert.alert('No se pudo eliminar', e.message); }
+        },
+      },
+    ]);
+  }
+
   const render = ({ item }) => (
     <Tarjeta>
       <View style={styles.row}>
@@ -122,6 +150,9 @@ export default function BilleteraScreen({ navigation }) {
       <Text style={styles.saldo}>
         {item.tipo === 'CHEQUE' ? 'Saldo garantizado' : 'Saldo disponible'}: ${Number(item.saldo_disponible).toLocaleString()}
       </Text>
+      <TouchableOpacity style={styles.borrar} onPress={() => eliminar(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Text style={styles.borrarTxt}>🗑 Eliminar</Text>
+      </TouchableOpacity>
     </Tarjeta>
   );
 
@@ -177,15 +208,16 @@ export default function BilleteraScreen({ navigation }) {
             {form.tipo === 'TARJETA' && (
               <>
                 <Campo label="Número de tarjeta" keyboardType="numeric" value={form.numero_identificador}
-                  placeholder="0000 0000 0000 0000"
-                  onChangeText={(v) => setForm((f) => ({ ...f, numero_identificador: v }))} />
+                  placeholder="0000 0000 0000 0000" maxLength={23}
+                  onChangeText={(v) => setForm((f) => ({ ...f, numero_identificador: formatTarjeta(v) }))} />
                 <Campo label="Titular" value={form.titular}
                   placeholder="Como figura en la tarjeta"
                   onChangeText={(v) => setForm((f) => ({ ...f, titular: v }))} />
                 <View style={styles.fila}>
                   <View style={styles.col}>
                     <Campo label="Vencimiento" value={form.vencimiento} placeholder="MM/AA"
-                      onChangeText={(v) => setForm((f) => ({ ...f, vencimiento: v }))} />
+                      keyboardType="numeric" maxLength={5}
+                      onChangeText={(v) => setForm((f) => ({ ...f, vencimiento: formatVenc(v) }))} />
                   </View>
                   <View style={styles.col}>
                     <Campo label="CVV" keyboardType="numeric" secureTextEntry value={form.cvv}
@@ -243,6 +275,8 @@ const styles = StyleSheet.create({
   medioTitulo: { fontWeight: '700', color: colors.textoOscuro, flex: 1 },
   medioNum: { color: colors.grisTexto, marginTop: 4 },
   saldo: { color: colors.azulMarino, marginTop: 4, fontWeight: '600' },
+  borrar: { alignSelf: 'flex-start', marginTop: 10 },
+  borrarTxt: { color: colors.rojo, fontWeight: '700', fontSize: 13 },
   hint: { color: colors.grisTexto, fontSize: 11, marginBottom: 10, marginTop: -4 },
   aviso: { color: colors.grisTexto, fontSize: 12, marginTop: 12, lineHeight: 18 },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

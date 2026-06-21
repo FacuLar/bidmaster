@@ -32,6 +32,7 @@ export const UsuarioAPI = {
 export const PagoAPI = {
   listar: () => api.get('/pagos/medios').then((r) => r.data),
   registrar: (medio) => api.post('/pagos/medios', medio).then((r) => r.data),
+  eliminar: (id) => api.delete(`/pagos/medios/${id}`).then((r) => r.data),
   estado: (id) => api.get(`/pagos/medios/${id}/estado`).then((r) => r.data),
 };
 

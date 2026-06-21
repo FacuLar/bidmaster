@@ -93,6 +93,16 @@ const listarMedios = asyncHandler(async (req, res) => {
   res.status(200).json(medios);
 });
 
+/* Eliminar un medio de pago — DELETE /pagos/medios/:id */
+const eliminarMedio = asyncHandler(async (req, res) => {
+  const medio = await MedioPago.findOne({
+    where: { id: req.params.id, usuario_id: req.usuario.id },
+  });
+  if (!medio) throw new AppError('Medio de pago no encontrado', 404);
+  await medio.destroy();
+  res.status(200).json({ mensaje: 'Medio de pago eliminado', id_medio: Number(req.params.id) });
+});
+
 /* 2.2 Verificar Estado de Medio de Pago — GET /pagos/medios/:id/estado */
 const estadoMedio = asyncHandler(async (req, res) => {
   const medio = await MedioPago.findOne({
@@ -140,6 +150,7 @@ const adminVerificarMedio = asyncHandler(async (req, res) => {
 module.exports = {
   registrarMedio,
   listarMedios,
+  eliminarMedio,
   estadoMedio,
   adminListarMedios,
   adminVerificarMedio,
