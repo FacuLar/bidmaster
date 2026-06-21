@@ -40,7 +40,7 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
       socket = await conectarSocket();
       socketRef.current = socket;
 
-      socket.emit('join_subasta', { id_subasta: idSubasta });
+      socket.emit('join_subasta', { id_subasta: idSubasta, id_pieza: pieza.id_pieza });
 
       socket.on('sala_unida', () => setEstado('🔴 EN VIVO'));
       socket.on('error_sala', (e) => {
@@ -69,10 +69,10 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
         Alert.alert('Puja rechazada', e.motivo);
       });
 
-      // Reloj de cierre (arranca con el primer puja de la subasta). Se ancla al
-      // reloj LOCAL usando segundos_restantes para evitar el desfasaje entre el
-      // reloj del celular y el del servidor (que hacía cerrar "antes de tiempo").
-      socket.on('subasta_timer', ({ cierra_ts, segundos_restantes }) => {
+      // Reloj de cierre de ESTA pieza. Se ancla al reloj LOCAL usando
+      // segundos_restantes para evitar el desfasaje de reloj celular/servidor.
+      socket.on('subasta_timer', ({ id_pieza, cierra_ts, segundos_restantes }) => {
+        if (id_pieza != null && String(id_pieza) !== String(pieza.id_pieza)) return; // otra pieza
         if (segundos_restantes != null) {
           cierreTsRef.current = Date.now() + segundos_restantes * 1000;
           setSegundos(segundos_restantes);
@@ -81,17 +81,20 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
         }
       });
 
-      // La subasta terminó: se declara ganador y se libera el bloqueo de salida.
-      socket.on('subasta_cerrada', ({ resultados }) => {
+      // Cerró ESTA pieza: se declara su ganador y se libera el bloqueo de salida.
+      const onPiezaCerrada = (d) => {
+        if (String(d.id_pieza) !== String(pieza.id_pieza)) return; // otra pieza de la subasta
         setCerrada(true);
         setSegundos(0);
-        const mio = resultados?.find((r) => String(r.id_pieza) === String(pieza.id_pieza));
-        const gané = mio && pujéRef.current && soyLiderRef.current;
+        const gané = pujéRef.current && soyLiderRef.current;
         Alert.alert(
-          'Subasta finalizada',
-          gané ? '¡Ganaste la pieza! Pasá a ver la liquidación.' : 'La subasta terminó.',
+          'Pieza finalizada',
+          gané ? '¡Ganaste la pieza! Pasá a ver la liquidación.' : 'La puja por esta pieza terminó.',
         );
-      });
+      };
+      socket.on('pieza_cerrada', onPiezaCerrada);
+      // Fallback: si finaliza toda la subasta, también se desbloquea la salida.
+      socket.on('subasta_cerrada', () => { setCerrada(true); setSegundos(0); });
     })();
 
     // Tick del countdown (1s).
@@ -112,6 +115,7 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
         socket.off('sala_unida');
         socket.off('error_sala');
         socket.off('subasta_timer');
+        socket.off('pieza_cerrada');
         socket.off('subasta_cerrada');
       }
     };

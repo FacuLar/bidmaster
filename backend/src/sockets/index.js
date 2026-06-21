@@ -21,8 +21,9 @@ const EXTENSION_MS = Number(process.env.EXTENSION_MS || 30000);
  *    (queda atado a esa hasta que termine; las demás quedan bloqueadas).
  *  - "Confirmación secuencial": no se procesa otra puja del mismo usuario
  *    hasta confirmar (o rechazar) la anterior.
- *  - Cierre automático: la subasta se cierra al minuto del primer puja y se
- *    declara ganador; ahí se libera el compromiso de los participantes.
+ *  - Cierre automático POR PIEZA: cada pieza se cierra al minuto de su primer
+ *    puja y se declara su ganador. La subasta sólo termina cuando ya no quedan
+ *    piezas abiertas (las demás piezas NO desaparecen al cerrar una).
  */
 function initSockets(io, app) {
   // Mapa usuario_id -> id_subasta (sala activa). Compartido con el controller
@@ -32,31 +33,44 @@ function initSockets(io, app) {
 
   // Usuarios con una puja en curso (lock de secuencialidad).
   const pujaEnCurso = new Set();
-  // Temporizadores de cierre por subasta (subasta_id -> timeout).
+  // Temporizadores de cierre por PIEZA (pieza_id -> { cierra_ts, timer }).
   const cierres = {};
 
-  /** Cierra una subasta: declara ganadores, avisa a la sala y libera locks. */
-  async function cerrarSubasta(idSubasta) {
-    delete cierres[idSubasta];
-    const subasta = await Subasta.findByPk(idSubasta);
-    if (!subasta || subasta.estado === 'finalizada') return;
-    subasta.estado = 'finalizada';
-    await subasta.save();
+  /**
+   * Cierra UNA pieza al vencer su reloj: declara su ganador (o compra de la
+   * empresa si no hubo ofertas) y avisa a la sala. Si esa era la última pieza
+   * abierta de la subasta, recién ahí finaliza la subasta completa.
+   */
+  async function cerrarPiezaTimer(idPieza) {
+    delete cierres[idPieza];
+    const pieza = await Pieza.findByPk(idPieza);
+    if (!pieza || pieza.estado !== 'en_subasta') return;
+    const idSubasta = pieza.subasta_id;
 
-    const piezas = await Pieza.findAll({ where: { subasta_id: idSubasta } });
-    const resultados = [];
-    for (const p of piezas) {
-      const r = await cerrarPieza(p.id);
-      resultados.push({ id_pieza: p.id, titulo: p.titulo, lider_id: p.lider_id, resultado: r ? r.resultado : 'sin_cambios' });
-    }
+    const r = await cerrarPieza(idPieza); // vende al líder o marca sin_ofertas
+    const piezaCerrada = await Pieza.findByPk(idPieza);
 
-    io.to(`subasta_${idSubasta}`).emit('subasta_cerrada', { id_subasta: idSubasta, resultados });
-
-    // Libera el lock de conexión de todos los que estaban en esa sala
-    // (el compromiso se libera solo, porque la subasta ya no está 'activa').
-    Object.keys(salasUsuarios).forEach((uid) => {
-      if (String(salasUsuarios[uid]) === String(idSubasta)) delete salasUsuarios[uid];
+    io.to(`subasta_${idSubasta}`).emit('pieza_cerrada', {
+      id_subasta: idSubasta,
+      id_pieza: idPieza,
+      titulo: piezaCerrada.titulo,
+      lider_id: piezaCerrada.lider_id,
+      resultado: r ? r.resultado : 'sin_cambios',
     });
+
+    // ¿Quedan piezas abiertas? Si no, la subasta termina.
+    const abiertas = await Pieza.count({ where: { subasta_id: idSubasta, estado: 'en_subasta' } });
+    if (abiertas === 0) {
+      const subasta = await Subasta.findByPk(idSubasta);
+      if (subasta && subasta.estado !== 'finalizada') {
+        subasta.estado = 'finalizada';
+        await subasta.save();
+      }
+      io.to(`subasta_${idSubasta}`).emit('subasta_cerrada', { id_subasta: idSubasta });
+      Object.keys(salasUsuarios).forEach((uid) => {
+        if (String(salasUsuarios[uid]) === String(idSubasta)) delete salasUsuarios[uid];
+      });
+    }
   }
 
   // Middleware de autenticación del socket.
@@ -79,7 +93,7 @@ function initSockets(io, app) {
 
     /* Unirse a la sala de una subasta. Si ya está comprometido (pujó) en otra
        subasta activa, queda bloqueado: no puede entrar a esta. */
-    socket.on('join_subasta', async ({ id_subasta }) => {
+    socket.on('join_subasta', async ({ id_subasta, id_pieza }) => {
       // Con una multa pendiente la cuenta está bloqueada: no puede unirse.
       const multa = await Multa.findOne({ where: { usuario_id: usuario.id, estado: 'con_deuda' } });
       if (multa) {
@@ -103,11 +117,12 @@ function initSockets(io, app) {
       socket.join(room);
       salasUsuarios[usuario.id] = id_subasta;
       socket.emit('sala_unida', { id_subasta });
-      // Si la subasta ya tiene cierre programado, informa cuánto falta.
-      if (cierres[id_subasta]) {
-        const cierra_ts = cierres[id_subasta].cierra_ts;
+      // Si la PIEZA que está mirando ya tiene cierre programado, informa cuánto falta.
+      if (id_pieza != null && cierres[id_pieza]) {
+        const cierra_ts = cierres[id_pieza].cierra_ts;
         socket.emit('subasta_timer', {
           id_subasta,
+          id_pieza,
           cierra_ts,
           segundos_restantes: Math.max(0, Math.round((cierra_ts - Date.now()) / 1000)),
         });
@@ -155,24 +170,27 @@ function initSockets(io, app) {
           lider_id: resultado.lider_id,
         });
 
-        // Cierre automático: al primer puja arranca el reloj. Anti-sniping: si
-        // alguien puja faltando poco, se extiende para que nadie "robe" el cierre.
+        // Cierre automático POR PIEZA: al primer puja de esa pieza arranca su
+        // reloj. Anti-sniping: si pujan faltando poco, se extiende. Cerrar una
+        // pieza NO afecta a las demás piezas de la subasta.
         const sub = resultado.id_subasta;
+        const key = resultado.id_pieza;
         let nuevoCierre = null;
-        if (!cierres[sub]) {
+        if (!cierres[key]) {
           nuevoCierre = Date.now() + DURACION_SUBASTA_MS;
         } else {
-          const restante = cierres[sub].cierra_ts - Date.now();
+          const restante = cierres[key].cierra_ts - Date.now();
           if (restante < EXTENSION_UMBRAL_MS) {
-            clearTimeout(cierres[sub].timer);
+            clearTimeout(cierres[key].timer);
             nuevoCierre = Date.now() + EXTENSION_MS;
           }
         }
         if (nuevoCierre) {
           const ms = nuevoCierre - Date.now();
-          cierres[sub] = { cierra_ts: nuevoCierre, timer: setTimeout(() => cerrarSubasta(sub), ms) };
+          cierres[key] = { cierra_ts: nuevoCierre, timer: setTimeout(() => cerrarPiezaTimer(key), ms) };
           io.to(`subasta_${sub}`).emit('subasta_timer', {
             id_subasta: sub,
+            id_pieza: key,
             cierra_ts: nuevoCierre,
             segundos_restantes: Math.max(0, Math.round(ms / 1000)),
           });

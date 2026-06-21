@@ -155,9 +155,14 @@ async function registrarPuja({ usuario, idSubasta, idPieza, monto, medioPagoId }
  * Devuelve null si no está comprometido con ninguna.
  */
 async function subastaComprometida(usuarioId) {
+  // Atado sólo si tiene una puja en una pieza TODAVÍA ABIERTA (en_subasta) de una
+  // subasta activa. Si su pieza ya cerró, queda libre para participar en otra.
   const puja = await Puja.findOne({
     where: { usuario_id: usuarioId },
-    include: [{ model: Subasta, as: 'subasta', where: { estado: 'activa' }, required: true }],
+    include: [
+      { model: Subasta, as: 'subasta', where: { estado: 'activa' }, required: true },
+      { model: Pieza, as: 'pieza', where: { estado: 'en_subasta' }, required: true },
+    ],
     order: [['createdAt', 'DESC']],
   });
   return puja ? puja.subasta_id : null;
