@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
 
 /* Pantalla introductoria con el logo (martillo dorado sobre azul marino). */
@@ -11,7 +12,7 @@ export default function SplashScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.martillo}>🔨</Text>
+      <Ionicons name="hammer" size={86} color={colors.dorado} />
       <Text style={styles.titulo}>BIDMASTER</Text>
       <Text style={styles.subtitulo}>SUBASTAS EXCLUSIVAS</Text>
     </View>

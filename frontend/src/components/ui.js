@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   TouchableOpacity, Text, TextInput, View, StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import colors, { radius, sombra } from '../theme/colors';
 
 /* ============================================================================
@@ -67,7 +68,7 @@ export function Header({ titulo, subtitulo, onAvisos, conAviso }) {
         </View>
         {onAvisos ? (
           <TouchableOpacity onPress={onAvisos} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.headerCampana}>
-            <Text style={styles.headerSobre}>✉️</Text>
+            <Ionicons name="notifications-outline" size={20} color={colors.blanco} />
             {conAviso ? <View style={styles.headerDot} /> : null}
           </TouchableOpacity>
         ) : null}

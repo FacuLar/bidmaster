@@ -10,9 +10,11 @@ import colors from '../theme/colors';
    llegó por mail al habilitarse la cuenta. NO se aprueba al instante. */
 export default function CompletarRegistroScreen({ route }) {
   const { guardarSesion, invitado } = useAuth();
-  // Datos de la solicitud: vienen por params o del invitado en sesión.
-  const id_solicitud = route.params?.id_solicitud || invitado?.id_solicitud;
-  const email = route.params?.email || invitado?.email;
+  // Datos de la solicitud: se capturan UNA vez al montar. Si se derivaran en vivo
+  // de `invitado`, al activar la cuenta (que limpia el invitado) quedarían vacíos
+  // y aparecería "No encontramos tu solicitud" antes de redirigir.
+  const [id_solicitud] = useState(() => route.params?.id_solicitud || invitado?.id_solicitud);
+  const [email] = useState(() => route.params?.email || invitado?.email);
 
   const [password, setPassword] = useState('');
   const [codigo, setCodigo] = useState('');

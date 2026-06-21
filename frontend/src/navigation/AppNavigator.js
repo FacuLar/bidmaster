@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
@@ -31,7 +31,10 @@ import FacturaFleteScreen from '../screens/FacturaFleteScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const icono = (txt) => ({ color }) => <Text style={{ color, fontSize: 18 }}>{txt}</Text>;
+// Ícono de tab con Ionicons (relleno cuando está activo, contorno si no).
+const tabIcon = (base) => ({ focused, color, size }) => (
+  <Ionicons name={focused ? base : `${base}-outline`} size={size ?? 23} color={color} />
+);
 
 /* Tabs principales una vez logueado: Catálogo, Billetera, Perfil. */
 function MainTabs() {
@@ -44,11 +47,11 @@ function MainTabs() {
       }}
     >
       <Tab.Screen name="Catálogo" component={HomeScreen}
-        options={{ tabBarIcon: icono('🔨') }} />
+        options={{ tabBarIcon: tabIcon('hammer') }} />
       <Tab.Screen name="Billetera" component={BilleteraScreen}
-        options={{ tabBarIcon: icono('💳') }} />
+        options={{ tabBarIcon: tabIcon('wallet') }} />
       <Tab.Screen name="Perfil" component={PerfilScreen}
-        options={{ tabBarIcon: icono('👤') }} />
+        options={{ tabBarIcon: tabIcon('person') }} />
     </Tab.Navigator>
   );
 }

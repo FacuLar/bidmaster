@@ -182,10 +182,26 @@ const confirmarDevolucion = asyncHandler(async (req, res) => {
     articulo.metodo_devolucion = 'envio';
     articulo.costo_flete = COSTO_FLETE_DEVOLUCION;
     await articulo.save();
+
+    // El flete se cobra con cargo al vendedor: se descuenta de su cuenta corriente.
+    let saldo_restante = null;
+    const cuenta = await MedioPago.findOne({
+      where: { usuario_id: req.usuario.id, tipo: 'CUENTA' },
+      order: [['saldo_disponible', 'DESC']],
+    });
+    if (cuenta) {
+      cuenta.saldo_disponible = Math.max(0, cuenta.saldo_disponible - COSTO_FLETE_DEVOLUCION);
+      await cuenta.save();
+      saldo_restante = cuenta.saldo_disponible;
+    }
+
     return res.status(200).json({
       metodo: 'envio',
       costo_flete: articulo.costo_flete,
-      mensaje: 'Se devuelve a tu domicilio con cargo de flete. Revisá la factura.',
+      saldo_restante,
+      mensaje: cuenta
+        ? `Se devuelve a tu domicilio. Se descontaron $${COSTO_FLETE_DEVOLUCION} de tu cuenta por el flete.`
+        : 'Se devuelve a tu domicilio con cargo de flete. Revisá la factura.',
     });
   }
   throw new AppError('Método inválido (RETIRO / ENVIO)', 400);

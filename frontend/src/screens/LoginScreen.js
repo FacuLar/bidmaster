@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Boton, Campo } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
@@ -35,7 +36,7 @@ export default function LoginScreen({ navigation }) {
     >
       <View style={styles.header}>
         <View style={styles.logoBadge}>
-          <Text style={styles.martillo}>🔨</Text>
+          <Ionicons name="hammer" size={44} color={colors.dorado} />
         </View>
         <Text style={styles.logo}>BIDMASTER</Text>
         <Text style={styles.tagline}>Subastas premium, en vivo</Text>
