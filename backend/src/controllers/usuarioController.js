@@ -1,4 +1,4 @@
-const { Puja, Pieza, Venta, Multa, MedioPago, Usuario } = require('../models');
+const { Puja, Pieza, Venta, Multa, MedioPago, Usuario, Subasta } = require('../models');
 const { AppError, asyncHandler } = require('../middleware/errorHandler');
 
 /* 1.3 Obtener Métricas del Perfil — GET /usuarios/perfil/metricas */
@@ -8,7 +8,7 @@ const metricas = asyncHandler(async (req, res) => {
   // Subastas ganadas + total invertido (a partir de las ventas).
   const ventas = await Venta.findAll({
     where: { usuario_id: usuario.id },
-    include: [{ model: Pieza, as: 'pieza' }],
+    include: [{ model: Pieza, as: 'pieza', include: [{ model: Subasta, as: 'subasta' }] }],
   });
   const subastas_ganadas = ventas.length;
   // Sólo cuenta como invertido lo efectivamente PAGADO.
@@ -25,6 +25,7 @@ const metricas = asyncHandler(async (req, res) => {
   const historial_pujas = ventas.map((v) => ({
     id_pieza: v.pieza_id,
     titulo: v.pieza ? v.pieza.titulo : 'Pieza',
+    moneda: v.pieza && v.pieza.subasta ? v.pieza.subasta.moneda : 'ARS',
     resultado: 'Ganada',
     estado_pago: v.estado_pago, // pendiente | pagada | impaga
     monto: v.monto_pujado,
@@ -116,6 +117,8 @@ const pagarMulta = asyncHandler(async (req, res) => {
     estado: 'pagada',
     mensaje: 'Multa pagada. Tu cuenta fue reactivada.',
     monto_pagado: multa.monto,
+    saldo_restante: medio.saldo_disponible,
+    medio: `${medio.tipo} ${medio.numero_identificador || ''}`.trim(),
   });
 });
 

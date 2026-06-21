@@ -23,6 +23,7 @@ export default function MisPujasScreen({ navigation }) {
   function pagar(item) {
     navigation.navigate('SubastaGanada', {
       pieza: { id_pieza: item.id_pieza, titulo: item.titulo },
+      moneda: item.moneda,
       factura: {
         monto_pujado: item.monto,
         comision_10_porciento: item.comision,

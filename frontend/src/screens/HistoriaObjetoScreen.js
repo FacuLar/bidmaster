@@ -1,9 +1,13 @@
 import React, { useState, useCallback } from 'react';
-import { ScrollView, View, Text, StyleSheet, Image, Alert, TouchableOpacity } from 'react-native';
+import {
+  ScrollView, View, Text, StyleSheet, Image, Alert, Dimensions,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Boton, Tarjeta } from '../components/ui';
+import { Boton, SelectorMedios } from '../components/ui';
 import { SubastaAPI, PagoAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+
+const ANCHO = Dimensions.get('window').width - 36; // ancho útil (padding 18 x2)
 
 /* Detalle/historia del objeto + elección del medio de pago antes de entrar. */
 export default function HistoriaObjetoScreen({ route, navigation }) {
@@ -16,18 +20,15 @@ export default function HistoriaObjetoScreen({ route, navigation }) {
   const [medios, setMedios] = useState([]);
   const [elegido, setElegido] = useState(null);
   const [entrando, setEntrando] = useState(false);
-
-  // Carrusel simple de las 6 fotos.
-  const fotos = Array.isArray(pieza.imagenes) ? pieza.imagenes : [];
   const [fotoActual, setFotoActual] = useState(0);
+
+  const fotos = Array.isArray(pieza.imagenes) ? pieza.imagenes : [];
 
   const cargarMedios = useCallback(async () => {
     try {
       const todos = await PagoAPI.listar();
-      // Solo medios verificados en la MONEDA de la subasta.
       const validos = todos.filter((m) => m.estado_verificacion === 'Verificado' && m.moneda === moneda);
       setMedios(validos);
-      // Preselecciona el primero que tenga fondos para el precio base.
       const conFondos = validos.find((m) => Number(m.saldo_disponible) >= base);
       setElegido((conFondos || validos[0])?.id ?? null);
     } catch (e) { /* silencioso */ }
@@ -37,6 +38,11 @@ export default function HistoriaObjetoScreen({ route, navigation }) {
 
   const medioElegido = medios.find((m) => m.id === elegido);
   const fondosOk = medioElegido && Number(medioElegido.saldo_disponible) >= base;
+
+  function onScroll(e) {
+    const i = Math.round(e.nativeEvent.contentOffset.x / ANCHO);
+    if (i !== fotoActual) setFotoActual(i);
+  }
 
   async function ingresar() {
     if (!medioElegido) {
@@ -60,17 +66,26 @@ export default function HistoriaObjetoScreen({ route, navigation }) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 18 }}>
+      {/* Carrusel deslizable de las 6 fotos. */}
       {fotos.length ? (
         <>
-          <Image source={{ uri: fotos[fotoActual] }} style={styles.img} />
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onScroll}
+            style={styles.carrusel}
+          >
+            {fotos.map((uri, i) => (
+              <Image key={i} source={{ uri }} style={styles.img} resizeMode="cover" />
+            ))}
+          </ScrollView>
           <View style={styles.dots}>
             {fotos.map((_, i) => (
-              <TouchableOpacity key={i} onPress={() => setFotoActual(i)}>
-                <View style={[styles.dot, i === fotoActual && styles.dotOn]} />
-              </TouchableOpacity>
+              <View key={i} style={[styles.dot, i === fotoActual && styles.dotOn]} />
             ))}
           </View>
-          <Text style={styles.fotoTxt}>Foto {fotoActual + 1} de {fotos.length}</Text>
+          <Text style={styles.fotoTxt}>Foto {fotoActual + 1} de {fotos.length} · deslizá para ver más →</Text>
         </>
       ) : (
         <View style={[styles.img, styles.ph]}><Text>Sin fotos</Text></View>
@@ -90,31 +105,10 @@ export default function HistoriaObjetoScreen({ route, navigation }) {
 
       {/* Elección del medio de pago con el que vas a pujar (#18). */}
       <Text style={styles.lbl}>Elegí el medio de pago para esta subasta ({moneda})</Text>
-      {medios.length === 0 ? (
-        <Tarjeta><Text style={styles.sinMedio}>No tenés medios verificados en {moneda}. Agregá uno en tu Billetera.</Text></Tarjeta>
-      ) : (
-        medios.map((m) => {
-          const ok = Number(m.saldo_disponible) >= base;
-          const sel = m.id === elegido;
-          return (
-            <TouchableOpacity key={m.id} activeOpacity={0.85}
-              onPress={() => setElegido(m.id)}
-              style={[styles.medio, sel && styles.medioSel, !ok && styles.medioNoFondos]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.medioTit}>
-                  {m.tipo === 'TARJETA' ? '💳' : m.tipo === 'CHEQUE' ? '🧾' : '🏦'} {m.tipo} · {m.entidad}
-                </Text>
-                <Text style={styles.medioSaldo}>Saldo: {simbolo}{Number(m.saldo_disponible).toLocaleString()}</Text>
-              </View>
-              {!ok && <Text style={styles.badgeNo}>Sin fondos</Text>}
-              {sel && ok && <Text style={styles.badgeOk}>✓</Text>}
-            </TouchableOpacity>
-          );
-        })
-      )}
+      <SelectorMedios medios={medios} elegido={elegido} onElegir={setElegido}
+        montoMinimo={base} simbolo={simbolo} />
 
-      <Boton title="INGRESAR A LA SALA" onPress={ingresar} loading={entrando}
-        disabled={!fondosOk} />
+      <Boton title="INGRESAR A LA SALA" onPress={ingresar} loading={entrando} disabled={!fondosOk} />
       {!fondosOk && medios.length > 0 && (
         <Text style={styles.aviso}>Elegí un medio con saldo suficiente para el precio base.</Text>
       )}
@@ -124,7 +118,8 @@ export default function HistoriaObjetoScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
-  img: { width: '100%', height: 220, borderRadius: 12, backgroundColor: colors.grisBorde },
+  carrusel: { width: ANCHO, height: 230, borderRadius: 12 },
+  img: { width: ANCHO, height: 230, borderRadius: 12, backgroundColor: colors.grisBorde },
   ph: { alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   dots: { flexDirection: 'row', justifyContent: 'center', marginTop: 8 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.grisBorde, marginHorizontal: 3 },
@@ -137,16 +132,5 @@ const styles = StyleSheet.create({
   historia: { color: colors.textoOscuro, lineHeight: 21 },
   precio: { fontWeight: '700', color: colors.azulMarino, marginBottom: 12 },
   lbl: { color: colors.azulMarino, fontWeight: '700', marginBottom: 8 },
-  medio: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.blanco,
-    borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1.5, borderColor: colors.grisBorde,
-  },
-  medioSel: { borderColor: colors.naranja, backgroundColor: '#FFFDFB' },
-  medioNoFondos: { opacity: 0.6 },
-  medioTit: { fontWeight: '700', color: colors.textoOscuro },
-  medioSaldo: { color: colors.grisTexto, fontSize: 12.5, marginTop: 2 },
-  badgeNo: { color: colors.rojo, fontWeight: '700', fontSize: 12 },
-  badgeOk: { color: colors.naranja, fontWeight: '900', fontSize: 18 },
-  sinMedio: { color: colors.grisTexto },
   aviso: { color: colors.rojo, fontSize: 12, textAlign: 'center', marginTop: 4 },
 });

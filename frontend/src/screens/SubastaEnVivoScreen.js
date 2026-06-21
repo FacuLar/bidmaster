@@ -149,7 +149,7 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
   async function verFactura() {
     try {
       const f = await PujaAPI.factura(pieza.id_pieza);
-      navigation.navigate('SubastaGanada', { factura: f, pieza });
+      navigation.navigate('SubastaGanada', { factura: f, pieza, moneda: subasta.moneda });
     } catch (e) {
       Alert.alert('Aún no', e.message);
     }

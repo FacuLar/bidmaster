@@ -159,6 +159,41 @@ export function Chip({ label, activo, onPress }) {
   );
 }
 
+/* Selector de medio de pago reutilizable (entrar a subasta, pagar pieza/multa).
+   Muestra saldo, marca "sin fondos" si no cubre `montoMinimo` y resalta el elegido. */
+export function SelectorMedios({ medios, elegido, onElegir, montoMinimo = 0, simbolo = '$' }) {
+  if (!medios || medios.length === 0) {
+    return (
+      <View style={styles.selMedioVacio}>
+        <Text style={styles.selMedioVacioTxt}>No tenés medios de pago verificados para esta operación.</Text>
+      </View>
+    );
+  }
+  const ico = (t) => (t === 'TARJETA' ? '💳' : t === 'CHEQUE' ? '🧾' : '🏦');
+  return (
+    <View>
+      {medios.map((m) => {
+        const ok = Number(m.saldo_disponible) >= montoMinimo;
+        const sel = m.id === elegido;
+        return (
+          <TouchableOpacity key={m.id} activeOpacity={0.85}
+            onPress={() => onElegir(m.id)}
+            style={[styles.selMedio, sel && styles.selMedioSel, !ok && styles.selMedioNoFondos]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.selMedioTit}>{ico(m.tipo)} {m.tipo} · {m.entidad}</Text>
+              <Text style={styles.selMedioSaldo}>
+                {m.numero_identificador ? `${m.numero_identificador} · ` : ''}Saldo: {simbolo}{Number(m.saldo_disponible).toLocaleString()}
+              </Text>
+            </View>
+            {!ok ? <Text style={styles.selBadgeNo}>Sin fondos</Text>
+              : sel ? <Text style={styles.selBadgeOk}>✓</Text> : null}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 /* Separador horizontal sutil. */
 export function Divider({ style }) {
   return <View style={[styles.divider, style]} />;
@@ -248,6 +283,19 @@ const styles = StyleSheet.create({
   chipTxtActivo: { color: colors.blanco },
 
   divider: { height: 1, backgroundColor: colors.grisBorde, marginVertical: 12 },
+
+  selMedio: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.blanco,
+    borderRadius: 12, padding: 13, marginBottom: 8, borderWidth: 1.5, borderColor: colors.grisBorde,
+  },
+  selMedioSel: { borderColor: colors.naranja, backgroundColor: '#FFFDFB' },
+  selMedioNoFondos: { opacity: 0.55 },
+  selMedioTit: { fontWeight: '700', color: colors.textoOscuro },
+  selMedioSaldo: { color: colors.grisTexto, fontSize: 12.5, marginTop: 2 },
+  selBadgeNo: { color: colors.rojo, fontWeight: '700', fontSize: 12 },
+  selBadgeOk: { color: colors.naranja, fontWeight: '900', fontSize: 18 },
+  selMedioVacio: { backgroundColor: '#FEF3C7', borderRadius: 10, padding: 12, marginBottom: 8 },
+  selMedioVacioTxt: { color: '#92400E', fontSize: 12.5 },
 
   empty: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 },
   emptyIcon: { fontSize: 44, marginBottom: 10 },

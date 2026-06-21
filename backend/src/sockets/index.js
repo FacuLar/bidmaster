@@ -6,6 +6,10 @@ const { JWT_SECRET } = require('../middleware/auth');
 
 // Duración de una subasta una vez que arranca (primer puja): se cierra al minuto.
 const DURACION_SUBASTA_MS = Number(process.env.DURACION_SUBASTA_MS || 60000);
+// Anti-sniping: si alguien puja faltando menos de UMBRAL, el cierre se estira a
+// EXTENSION (la subasta no termina hasta que nadie supere la última oferta).
+const EXTENSION_UMBRAL_MS = Number(process.env.EXTENSION_UMBRAL_MS || 15000);
+const EXTENSION_MS = Number(process.env.EXTENSION_MS || 30000);
 
 /**
  * Motor de pujas en tiempo real.
@@ -151,17 +155,26 @@ function initSockets(io, app) {
           lider_id: resultado.lider_id,
         });
 
-        // Cierre automático: al primer puja, arranca el reloj de 1 minuto.
-        if (!cierres[resultado.id_subasta]) {
-          const cierra_ts = Date.now() + DURACION_SUBASTA_MS;
-          cierres[resultado.id_subasta] = {
-            cierra_ts,
-            timer: setTimeout(() => cerrarSubasta(resultado.id_subasta), DURACION_SUBASTA_MS),
-          };
-          io.to(`subasta_${resultado.id_subasta}`).emit('subasta_timer', {
-            id_subasta: resultado.id_subasta,
-            cierra_ts,
-            segundos_restantes: Math.max(0, Math.round((cierra_ts - Date.now()) / 1000)),
+        // Cierre automático: al primer puja arranca el reloj. Anti-sniping: si
+        // alguien puja faltando poco, se extiende para que nadie "robe" el cierre.
+        const sub = resultado.id_subasta;
+        let nuevoCierre = null;
+        if (!cierres[sub]) {
+          nuevoCierre = Date.now() + DURACION_SUBASTA_MS;
+        } else {
+          const restante = cierres[sub].cierra_ts - Date.now();
+          if (restante < EXTENSION_UMBRAL_MS) {
+            clearTimeout(cierres[sub].timer);
+            nuevoCierre = Date.now() + EXTENSION_MS;
+          }
+        }
+        if (nuevoCierre) {
+          const ms = nuevoCierre - Date.now();
+          cierres[sub] = { cierra_ts: nuevoCierre, timer: setTimeout(() => cerrarSubasta(sub), ms) };
+          io.to(`subasta_${sub}`).emit('subasta_timer', {
+            id_subasta: sub,
+            cierra_ts: nuevoCierre,
+            segundos_restantes: Math.max(0, Math.round(ms / 1000)),
           });
         }
       } catch (err) {
