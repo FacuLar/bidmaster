@@ -17,6 +17,13 @@ const Pieza = sequelize.define('Pieza', {
   artista: { type: DataTypes.STRING },
   fecha_obra: { type: DataTypes.STRING },
   historia: { type: DataTypes.TEXT },
+  // --- Clasificación para búsqueda y filtros ---
+  // Categoría principal: arte | tecnologia | moda | joyas | vehiculos | hobbies
+  categoria: { type: DataTypes.STRING },
+  // Etiquetas de atributos (Lujo, Vintage, Colección, etc.).
+  tags: { type: DataTypes.JSON, defaultValue: [] },
+  // Estado de uso: nuevo | poco_uso | usado | sellado | restaurado
+  uso: { type: DataTypes.STRING },
   // Estado de la oferta en tiempo real.
   oferta_actual: { type: DataTypes.FLOAT, defaultValue: 0 },
   estado: {

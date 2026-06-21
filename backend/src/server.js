@@ -23,6 +23,11 @@ async function migrarColumnasNuevas() {
     subastas: {
       pieza_actual_id: { type: DataTypes.INTEGER, allowNull: true },
     },
+    piezas: {
+      categoria: { type: DataTypes.STRING, allowNull: true },
+      tags: { type: DataTypes.JSON, allowNull: true },
+      uso: { type: DataTypes.STRING, allowNull: true },
+    },
     medios_pago: {
       marca: { type: DataTypes.STRING, allowNull: true },
       titular: { type: DataTypes.STRING, allowNull: true },

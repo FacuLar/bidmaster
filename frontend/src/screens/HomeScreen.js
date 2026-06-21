@@ -1,13 +1,14 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl, Alert,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl, Alert, TextInput, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Tarjeta, Boton, Header, BannerInvitado, Insignia, EmptyState } from '../components/ui';
+import { Tarjeta, Boton, Header, BannerInvitado, Insignia, EmptyState, Chip } from '../components/ui';
 import { SubastaAPI } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
+import { CATEGORIAS, TAGS, USOS, labelUso, norm } from '../theme/taxonomia';
 
 // Texto "Común o superior" para la categoría requerida (igual al wireframe).
 const capit = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -18,6 +19,28 @@ export default function HomeScreen({ navigation }) {
   const [subastas, setSubastas] = useState([]);
   const [piezas, setPiezas] = useState([]);
   const [cargando, setCargando] = useState(false);
+  // Búsqueda y filtros del catálogo.
+  const [query, setQuery] = useState('');
+  const [catSel, setCatSel] = useState(null);
+  const [usoSel, setUsoSel] = useState(null);
+  const [tagsSel, setTagsSel] = useState([]);
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+
+  const toggleTag = (t) => setTagsSel((ts) => (ts.includes(t) ? ts.filter((x) => x !== t) : [...ts, t]));
+  const limpiar = () => { setQuery(''); setCatSel(null); setUsoSel(null); setTagsSel([]); };
+  const hayFiltros = !!(query.trim() || catSel || usoSel || tagsSel.length);
+
+  const piezasFiltradas = piezas.filter((p) => {
+    if (catSel && p.categoria !== catSel) return false;
+    if (usoSel && p.uso !== usoSel) return false;
+    if (tagsSel.length && !tagsSel.some((t) => (p.tags || []).includes(t))) return false;
+    if (query.trim()) {
+      const q = norm(query);
+      const heno = `${norm(p.titulo)} ${norm(p.descripcion)} ${norm(p.artista)} ${norm((p.tags || []).join(' '))}`;
+      if (!heno.includes(q)) return false;
+    }
+    return true;
+  });
 
   const cargar = useCallback(async (m) => {
     setCargando(true);
@@ -94,6 +117,17 @@ export default function HomeScreen({ navigation }) {
             <Insignia texto={capit(item.subasta.categoria_requerida)} color={colors.dorado} variant="soft" />
           </View>
           <Text style={styles.meta}>🕒 Hoy {item.subasta.hora}hs · 🎙️ {item.subasta.rematador}</Text>
+          {(item.categoria || item.uso || (item.tags && item.tags.length)) ? (
+            <View style={styles.clasifRow}>
+              {(CATEGORIAS.find((c) => c.k === item.categoria) || {}).icon ? (
+                <Text style={styles.clasifCat}>
+                  {(CATEGORIAS.find((c) => c.k === item.categoria) || {}).icon} {(CATEGORIAS.find((c) => c.k === item.categoria) || {}).label}
+                </Text>
+              ) : null}
+              {item.uso ? <Text style={styles.clasifPill}>{labelUso(item.uso)}</Text> : null}
+              {item.tags && item.tags[0] ? <Text style={styles.clasifPill}>{item.tags[0]}</Text> : null}
+            </View>
+          ) : null}
 
           <View style={styles.precioRow}>
             <Text style={styles.precioLbl}>Precio base</Text>
@@ -132,15 +166,74 @@ export default function HomeScreen({ navigation }) {
           <Tab val="USD" label="En Dólares" />
         </View>
 
+        {/* Buscador + filtros */}
+        <View style={styles.buscador}>
+          <View style={styles.searchBox}>
+            <Text style={styles.lupa}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar por nombre, artista o etiqueta…"
+              placeholderTextColor={colors.textoSuave}
+              value={query}
+              onChangeText={setQuery}
+            />
+            {query ? (
+              <TouchableOpacity onPress={() => setQuery('')}><Text style={styles.limpiarX}>✕</Text></TouchableOpacity>
+            ) : null}
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+            <Chip label="Todas" activo={!catSel} onPress={() => setCatSel(null)} />
+            {CATEGORIAS.map((c) => (
+              <Chip key={c.k} label={`${c.icon} ${c.label}`} activo={catSel === c.k}
+                onPress={() => setCatSel(catSel === c.k ? null : c.k)} />
+            ))}
+          </ScrollView>
+
+          <View style={styles.filtrosBarra}>
+            <TouchableOpacity onPress={() => setMostrarFiltros((v) => !v)}>
+              <Text style={styles.filtrosTxt}>
+                ⚙ Filtros{(tagsSel.length || usoSel) ? ` (${tagsSel.length + (usoSel ? 1 : 0)})` : ''} {mostrarFiltros ? '▲' : '▼'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.resultTxt}>
+              {piezasFiltradas.length} resultado{piezasFiltradas.length !== 1 ? 's' : ''}
+              {hayFiltros ? <Text style={styles.limpiar} onPress={limpiar}>  · Limpiar</Text> : null}
+            </Text>
+          </View>
+
+          {mostrarFiltros && (
+            <View style={styles.panelFiltros}>
+              <Text style={styles.filtroLbl}>Estado de uso</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+                {USOS.map((u) => (
+                  <Chip key={u.k} label={u.label} activo={usoSel === u.k}
+                    onPress={() => setUsoSel(usoSel === u.k ? null : u.k)} />
+                ))}
+              </ScrollView>
+              <Text style={styles.filtroLbl}>Etiquetas</Text>
+              <View style={styles.tagsWrap}>
+                {TAGS.map((t) => (
+                  <View key={t} style={{ marginBottom: 8 }}>
+                    <Chip label={t} activo={tagsSel.includes(t)} onPress={() => toggleTag(t)} />
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
+
         <FlatList
-          data={piezas}
+          data={piezasFiltradas}
           keyExtractor={(it) => String(it.id_pieza)}
           renderItem={renderItem}
           contentContainerStyle={{ padding: 14, paddingBottom: 24 }}
           refreshControl={<RefreshControl refreshing={cargando} onRefresh={() => cargar(moneda)} />}
           ListEmptyComponent={!cargando && (
-            <EmptyState icon="🏛️" titulo="Sin subastas activas"
-              texto={`No hay subastas en ${moneda === 'ARS' ? 'pesos' : 'dólares'} por ahora. Probá refrescando o cambiá de moneda.`} />
+            hayFiltros
+              ? <EmptyState icon="🔎" titulo="Sin resultados" texto="Ningún ítem coincide con la búsqueda o los filtros. Probá limpiarlos." />
+              : <EmptyState icon="🏛️" titulo="Sin subastas activas"
+                  texto={`No hay subastas en ${moneda === 'ARS' ? 'pesos' : 'dólares'} por ahora. Probá refrescando o cambiá de moneda.`} />
           )}
         />
       </View>
@@ -156,6 +249,24 @@ const styles = StyleSheet.create({
   tabTxt: { color: colors.grisTexto, fontWeight: '600' },
   tabActivo: { color: colors.azulMarino, fontWeight: '800' },
   tabLinea: { height: 3, backgroundColor: colors.naranja, width: '100%', marginTop: 6, borderRadius: 2 },
+
+  buscador: { backgroundColor: colors.blanco, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.grisBorde },
+  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.grisPerla, borderRadius: 10, paddingHorizontal: 10 },
+  lupa: { fontSize: 15, marginRight: 6 },
+  searchInput: { flex: 1, paddingVertical: 9, fontSize: 14, color: colors.textoOscuro },
+  limpiarX: { color: colors.grisTexto, fontWeight: '800', fontSize: 15, paddingHorizontal: 4 },
+  chipsRow: { paddingVertical: 10, paddingRight: 8 },
+  filtrosBarra: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 4 },
+  filtrosTxt: { color: colors.azulMarino, fontWeight: '700', fontSize: 13 },
+  resultTxt: { color: colors.grisTexto, fontSize: 12 },
+  limpiar: { color: colors.naranja, fontWeight: '700' },
+  panelFiltros: { borderTopWidth: 1, borderTopColor: colors.grisBorde, marginTop: 4, paddingTop: 6 },
+  filtroLbl: { color: colors.azulMarino, fontWeight: '700', fontSize: 12, marginTop: 4 },
+  tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 },
+
+  clasifRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 6 },
+  clasifCat: { color: colors.azulMarino, fontWeight: '700', fontSize: 11.5, marginRight: 8 },
+  clasifPill: { backgroundColor: colors.grisPerla, color: colors.grisTexto, fontSize: 10.5, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, marginRight: 6, overflow: 'hidden' },
 
   card: { padding: 0, overflow: 'hidden' },
   imgWrap: { position: 'relative' },

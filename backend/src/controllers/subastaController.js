@@ -54,6 +54,9 @@ const catalogo = asyncHandler(async (req, res) => {
     fecha_obra: p.fecha_obra,
     historia: p.historia,
     imagenes: p.imagenes,
+    categoria: p.categoria,
+    tags: p.tags || [],
+    uso: p.uso,
     oferta_actual: p.oferta_actual,
     estado: p.estado,
     // Sólo los usuarios registrados ven el precio base.

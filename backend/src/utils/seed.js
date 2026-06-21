@@ -67,50 +67,50 @@ async function seed() {
   });
   await Pieza.bulkCreate([
     {
-      nro_pieza: 101, titulo: 'Juego de Té (18 piezas)',
+      nro_pieza: 101, categoria: 'arte', tags: ['Vintage','Colección','Impecable'], uso: 'usado', titulo: 'Juego de Té (18 piezas)',
       descripcion: 'Juego de porcelana inglesa de 18 piezas, pintado a mano.', precio_base: 45000,
       historia: 'Vajilla de una estancia bonaerense de principios del siglo XX.',
       imagenes: fotos('tea,set,porcelain'), subasta_id: subastaArs.id, dueno_id: oro.id,
     },
     {
-      nro_pieza: 102, titulo: 'Cuadro Vanguardista',
+      nro_pieza: 102, categoria: 'arte', tags: ['Arte','Exclusivo','Raro'], uso: 'usado', titulo: 'Cuadro Vanguardista',
       descripcion: 'Óleo sobre tela, corriente vanguardista.', precio_base: 180000,
       artista: 'A. Spilimbergo', fecha_obra: '1945',
       historia: 'Perteneció a una colección privada europea.',
       imagenes: fotos('painting,art'), subasta_id: subastaArs.id, dueno_id: oro.id,
     },
     {
-      nro_pieza: 103, titulo: 'Reloj de Pie Inglés',
+      nro_pieza: 103, categoria: 'arte', tags: ['Vintage','Colección','Impecable'], uso: 'restaurado', titulo: 'Reloj de Pie Inglés',
       descripcion: 'Reloj de pie de roble, mecanismo a péndulo funcionando.', precio_base: 95000,
       fecha_obra: '1890', historia: 'Restaurado por relojeros de la casa Mappin.',
       imagenes: fotos('grandfather,clock'), subasta_id: subastaArs.id, dueno_id: oro.id,
     },
     {
-      nro_pieza: 104, titulo: 'Lámpara Art Déco',
+      nro_pieza: 104, categoria: 'arte', tags: ['Vintage','Exclusivo'], uso: 'usado', titulo: 'Lámpara Art Déco',
       descripcion: 'Lámpara de bronce y vidrio opalino, estilo Art Déco.', precio_base: 38000,
       artista: 'Taller Lalique (atrib.)', fecha_obra: '1925',
       imagenes: fotos('lamp,art,deco'), subasta_id: subastaArs.id, dueno_id: oro.id,
     },
     {
-      nro_pieza: 105, titulo: 'Colección de Monedas de Plata',
+      nro_pieza: 105, categoria: 'joyas', tags: ['Colección','Raro','Lujo'], uso: 'usado', titulo: 'Colección de Monedas de Plata',
       descripcion: 'Set de 24 monedas de plata 900, distintas épocas.', precio_base: 60000,
       historia: 'Incluye piezas patrias de la primera moneda nacional.',
       imagenes: fotos('silver,coins'), subasta_id: subastaArs.id, dueno_id: facundo.id,
     },
     {
-      nro_pieza: 106, titulo: 'Máquina de Escribir Olivetti',
+      nro_pieza: 106, categoria: 'tecnologia', tags: ['Vintage','Colección','Impecable'], uso: 'restaurado', titulo: 'Máquina de Escribir Olivetti',
       descripcion: 'Olivetti Lettera 32 restaurada, con estuche original.', precio_base: 22000,
       fecha_obra: '1963', historia: 'Modelo usado por cronistas de la época.',
       imagenes: fotos('typewriter'), subasta_id: subastaArs.id, dueno_id: facundo.id,
     },
     {
-      nro_pieza: 107, titulo: 'Escultura en Bronce',
+      nro_pieza: 107, categoria: 'arte', tags: ['Arte','Exclusivo','Raro'], uso: 'usado', titulo: 'Escultura en Bronce',
       descripcion: 'Figura femenina en bronce patinado, base de mármol.', precio_base: 130000,
       artista: 'L. Falcini', fecha_obra: '1938',
       imagenes: fotos('bronze,sculpture'), subasta_id: subastaArs.id, dueno_id: oro.id,
     },
     {
-      nro_pieza: 108, titulo: 'Guitarra Criolla de Autor',
+      nro_pieza: 108, categoria: 'hobbies', tags: ['Exclusivo','Impecable'], uso: 'poco_uso', titulo: 'Guitarra Criolla de Autor',
       descripcion: 'Guitarra de luthier, tapa de cedro y aros de palo santo.', precio_base: 70000,
       historia: 'Construida por un luthier reconocido de la escena folclórica.',
       imagenes: fotos('classical,guitar'), subasta_id: subastaArs.id, dueno_id: facundo.id,
@@ -126,7 +126,7 @@ async function seed() {
   });
   await Pieza.bulkCreate([
     {
-      nro_pieza: 402, titulo: 'Reloj Rolex Vintage (1960)',
+      nro_pieza: 402, categoria: 'joyas', tags: ['Lujo','Vintage','Exclusivo'], uso: 'usado', titulo: 'Reloj Rolex Vintage (1960)',
       descripcion: 'Reloj Rolex Ref #402, edición de colección.', precio_base: 10000,
       artista: 'Rolex Geneva', fecha_obra: '1960',
       historia: 'Perteneció a la colección de un diplomático europeo. Estuche original.',
@@ -134,19 +134,19 @@ async function seed() {
       subasta_id: subastaUsd.id, dueno_id: oro.id,
     },
     {
-      nro_pieza: 403, titulo: 'Omega Speedmaster',
+      nro_pieza: 403, categoria: 'joyas', tags: ['Lujo','Garantía Oficial'], uso: 'poco_uso', titulo: 'Omega Speedmaster',
       descripcion: 'Cronógrafo Omega Speedmaster, acero, caja de 42mm.', precio_base: 6500,
       artista: 'Omega', fecha_obra: '1998',
       imagenes: fotos('chronograph,watch'), subasta_id: subastaUsd.id, dueno_id: oro.id,
     },
     {
-      nro_pieza: 404, titulo: 'Cartier Tank',
+      nro_pieza: 404, categoria: 'joyas', tags: ['Lujo','Vintage','Exclusivo'], uso: 'usado', titulo: 'Cartier Tank',
       descripcion: 'Reloj Cartier Tank, oro amarillo 18k, correa de cuero.', precio_base: 12000,
       artista: 'Cartier', fecha_obra: '1975',
       imagenes: fotos('gold,watch'), subasta_id: subastaUsd.id, dueno_id: oro.id,
     },
     {
-      nro_pieza: 405, titulo: 'Pluma Montblanc Meisterstück',
+      nro_pieza: 405, categoria: 'moda', tags: ['Lujo','Edición Especial'], uso: 'nuevo', titulo: 'Pluma Montblanc Meisterstück',
       descripcion: 'Pluma estilográfica Montblanc, plumín de oro 14k.', precio_base: 1800,
       artista: 'Montblanc', imagenes: fotos('fountain,pen'),
       subasta_id: subastaUsd.id, dueno_id: facundo.id,
@@ -163,20 +163,20 @@ async function seed() {
   });
   await Pieza.bulkCreate([
     {
-      nro_pieza: 201, titulo: 'Óleo de Gran Maestro',
+      nro_pieza: 201, categoria: 'arte', tags: ['Arte','Exclusivo','Raro','Limitado'], uso: 'usado', titulo: 'Óleo de Gran Maestro',
       descripcion: 'Óleo sobre tela de gran formato, marco de época.', precio_base: 1500000,
       artista: 'B. Quinquela Martín', fecha_obra: '1932',
       historia: 'Vista del puerto de La Boca. Procedencia documentada.',
       imagenes: fotos('harbor,painting'), subasta_id: subastaOro.id, dueno_id: facundo.id,
     },
     {
-      nro_pieza: 202, titulo: 'Collar de Esmeraldas',
+      nro_pieza: 202, categoria: 'joyas', tags: ['Lujo','Exclusivo','Raro'], uso: 'nuevo', titulo: 'Collar de Esmeraldas',
       descripcion: 'Collar de oro 18k con esmeraldas colombianas y diamantes.', precio_base: 2200000,
       historia: 'Joya de alta relojería, certificado gemológico incluido.',
       imagenes: fotos('emerald,necklace'), subasta_id: subastaOro.id, dueno_id: facundo.id,
     },
     {
-      nro_pieza: 203, titulo: 'Primera Edición Firmada',
+      nro_pieza: 203, categoria: 'hobbies', tags: ['Colección','Raro','Limitado'], uso: 'usado', titulo: 'Primera Edición Firmada',
       descripcion: 'Primera edición de una obra cumbre, firmada por el autor.', precio_base: 850000,
       fecha_obra: '1944', historia: 'Ejemplar numerado de una tirada limitada.',
       imagenes: fotos('antique,book'), subasta_id: subastaOro.id, dueno_id: facundo.id,
