@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl, Alert, TextInput, ScrollView,
+  View, Text, StyleSheet, SectionList, TouchableOpacity, Image, RefreshControl, Alert, TextInput, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -44,6 +44,11 @@ export default function HomeScreen({ navigation }) {
     }
     return true;
   });
+
+  // Agrupa los ítems por SUBASTA: cada subasta es una sección con sus objetos.
+  const secciones = subastas
+    .map((s) => ({ subasta: s, data: piezasFiltradas.filter((p) => p.subasta.id_subasta === s.id_subasta) }))
+    .filter((sec) => sec.data.length > 0);
 
   const cargar = useCallback(async (m) => {
     setCargando(true);
@@ -91,64 +96,52 @@ export default function HomeScreen({ navigation }) {
     </TouchableOpacity>
   );
 
-  const renderItem = ({ item }) => {
-    const accesible = item.subasta.accesible;
+  // Header de cada SUBASTA (con la cantidad de objetos y el botón de ingresar).
+  const renderSubastaHeader = ({ section }) => {
+    const s = section.subasta;
+    const simbolo = s.moneda === 'USD' ? 'US$' : '$';
     return (
-      <Tarjeta style={styles.card}>
-        <View style={styles.imgWrap}>
-          {item.imagenes && item.imagenes[0]
-            ? <Image source={{ uri: item.imagenes[0] }} style={styles.img} />
-            : <View style={[styles.img, styles.imgPlaceholder]}><Text style={styles.imgTxt}>🖼️ Imagen del Artículo</Text></View>}
-          {item.subasta.en_curso ? (
-            <View style={styles.envivo}>
-              <View style={styles.envivoDot} />
-              <Text style={styles.envivoTxt}>EN VIVO</Text>
-            </View>
-          ) : (
-            <View style={styles.programada}>
-              <Text style={styles.programadaTxt}>⏳ PROGRAMADA</Text>
-            </View>
-          )}
-          {!accesible && (
-            <View style={styles.lockBadge}><Text style={styles.lockTxt}>🔒 Categoría superior</Text></View>
-          )}
+      <View style={styles.subHeader}>
+        <View style={styles.subHeaderTop}>
+          <Text style={styles.subTitulo} numberOfLines={1}>{s.titulo}</Text>
+          {s.en_curso
+            ? <View style={styles.envivoMini}><View style={styles.envivoDot} /><Text style={styles.envivoTxt}>EN VIVO</Text></View>
+            : <Text style={styles.progMini}>⏳ PROGRAMADA</Text>}
         </View>
-
-        <View style={styles.cardBody}>
-          <View style={styles.tituloRow}>
-            <Text style={styles.titulo} numberOfLines={1}>{item.titulo}</Text>
-            <Insignia texto={capit(item.subasta.categoria_requerida)} color={colors.dorado} variant="soft" />
+        <Text style={styles.subMeta}>
+          📦 {section.data.length} objeto{section.data.length !== 1 ? 's' : ''} · 🕒 {s.hora}hs · 🎙️ {s.rematador} · {simbolo}
+        </Text>
+        <View style={styles.subHeaderBtns}>
+          <Insignia texto={`Cat. ${capit(s.categoria_requerida)}`} color={colors.dorado} variant="soft" />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Boton title={s.accesible ? 'INGRESAR A LA SALA' : '🔒 NO DISPONIBLE'} size="sm"
+              onPress={() => abrirSala(section.data[0])} disabled={!s.accesible} style={{ marginVertical: 0 }} />
           </View>
-          <Text style={styles.meta}>🕒 Hoy {item.subasta.hora}hs · 🎙️ {item.subasta.rematador}</Text>
-          {(item.categoria || item.uso || (item.tags && item.tags.length)) ? (
-            <View style={styles.clasifRow}>
-              {(CATEGORIAS.find((c) => c.k === item.categoria) || {}).icon ? (
-                <Text style={styles.clasifCat}>
-                  {(CATEGORIAS.find((c) => c.k === item.categoria) || {}).icon} {(CATEGORIAS.find((c) => c.k === item.categoria) || {}).label}
-                </Text>
-              ) : null}
-              {item.uso ? <Text style={styles.clasifPill}>{labelUso(item.uso)}</Text> : null}
-              {item.tags && item.tags[0] ? <Text style={styles.clasifPill}>{item.tags[0]}</Text> : null}
-            </View>
-          ) : null}
-
-          <View style={styles.precioRow}>
-            <Text style={styles.precioLbl}>Precio base</Text>
-            <Text style={styles.precio}>
-              {item.precio_base != null ? `$${item.precio_base.toLocaleString()}` : '🔒 registrate para ver'}
-            </Text>
-          </View>
-
-          <Boton
-            title={accesible ? 'INGRESAR A LA SALA' : 'NO DISPONIBLE'}
-            icon={accesible ? '🚪' : undefined}
-            onPress={() => abrirSala(item)}
-            disabled={!accesible}
-          />
         </View>
-      </Tarjeta>
+      </View>
     );
   };
+
+  // Card compacta de cada objeto (tocá para ver el detalle / entrar).
+  const renderItem = ({ item }) => (
+    <Tarjeta style={styles.itemCard} onPress={() => abrirSala(item)}>
+      {item.imagenes && item.imagenes[0]
+        ? <Image source={{ uri: item.imagenes[0] }} style={styles.itemImg} />
+        : <View style={[styles.itemImg, styles.imgPlaceholder]}><Text style={styles.imgTxt}>🖼️</Text></View>}
+      <View style={styles.itemBody}>
+        <Text style={styles.titulo} numberOfLines={1}>{item.titulo}</Text>
+        <View style={styles.clasifRow}>
+          {(CATEGORIAS.find((c) => c.k === item.categoria) || {}).icon ? (
+            <Text style={styles.clasifCat}>{(CATEGORIAS.find((c) => c.k === item.categoria) || {}).icon} {(CATEGORIAS.find((c) => c.k === item.categoria) || {}).label}</Text>
+          ) : null}
+          {item.uso ? <Text style={styles.clasifPill}>{labelUso(item.uso)}</Text> : null}
+        </View>
+        <Text style={styles.precio}>
+          {item.precio_base != null ? `$${item.precio_base.toLocaleString()}` : '🔒 registrate para ver'}
+        </Text>
+      </View>
+    </Tarjeta>
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -226,10 +219,12 @@ export default function HomeScreen({ navigation }) {
           )}
         </View>
 
-        <FlatList
-          data={piezasFiltradas}
+        <SectionList
+          sections={secciones}
           keyExtractor={(it) => String(it.id_pieza)}
           renderItem={renderItem}
+          renderSectionHeader={renderSubastaHeader}
+          stickySectionHeadersEnabled={false}
           contentContainerStyle={{ padding: 14, paddingBottom: 24 }}
           refreshControl={<RefreshControl refreshing={cargando} onRefresh={() => cargar(moneda)} />}
           ListEmptyComponent={!cargando && (
@@ -300,5 +295,22 @@ const crearStyles = (colors) => StyleSheet.create({
     marginTop: 12, marginBottom: 4,
   },
   precioLbl: { color: colors.verdeOscuro, fontSize: 12, fontWeight: '600' },
-  precio: { color: colors.verdeOscuro, fontWeight: '800', fontSize: 15 },
+  precio: { color: colors.verdeOscuro, fontWeight: '800', fontSize: 14 },
+
+  // Header de subasta (sección)
+  subHeader: {
+    backgroundColor: colors.superficie, borderRadius: 14, padding: 13, marginTop: 14, marginBottom: 8,
+    borderWidth: 1, borderColor: colors.borde, borderLeftWidth: 4, borderLeftColor: colors.naranja,
+  },
+  subHeaderTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  subTitulo: { fontSize: 16, fontWeight: '800', color: colors.azulMarino, flex: 1, marginRight: 8 },
+  envivoMini: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.nav, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  progMini: { color: colors.doradoOscuro, fontWeight: '800', fontSize: 10.5 },
+  subMeta: { color: colors.grisTexto, fontSize: 12, marginTop: 4 },
+  subHeaderBtns: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
+
+  // Card compacta del objeto
+  itemCard: { flexDirection: 'row', padding: 8, marginVertical: 5, alignItems: 'center' },
+  itemImg: { width: 64, height: 64, borderRadius: 8, backgroundColor: colors.grisPerla },
+  itemBody: { flex: 1, marginLeft: 12 },
 });
