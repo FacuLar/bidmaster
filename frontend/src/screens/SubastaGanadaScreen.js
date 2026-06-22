@@ -3,9 +3,12 @@ import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
 import { Boton, Tarjeta, SelectorMedios } from '../components/ui';
 import { PagoAPI, PujaAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /* Resumen de compra / liquidación del ganador, con elección del medio de pago. */
 export default function SubastaGanadaScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { factura, pieza, moneda = 'ARS' } = route.params;
   const simbolo = moneda === 'USD' ? 'US$' : '$';
   const total = Number(factura.total_a_pagar) || 0;
@@ -96,7 +99,7 @@ export default function SubastaGanadaScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
   header: { backgroundColor: colors.verde, padding: 18 },
   headerTxt: { color: colors.blanco, fontSize: 20, fontWeight: '800' },

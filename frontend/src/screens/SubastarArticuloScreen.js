@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Boton, Campo, SelectorMedios } from '../components/ui';
 import { VendedorAPI, PagoAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 const TIPOS = [
   { k: 'otro', label: 'Otro' },
@@ -16,6 +17,8 @@ const TIPOS = [
 
 /* Formulario para proponer un bien propio a remate (Módulo 5). */
 export default function SubastarArticuloScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [historia, setHistoria] = useState('');
@@ -158,12 +161,12 @@ export default function SubastarArticuloScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
   lbl: { color: colors.azulMarino, fontWeight: '600', marginBottom: 6 },
   tipos: { flexDirection: 'row', marginBottom: 14 },
   tipo: { borderWidth: 1, borderColor: colors.grisBorde, borderRadius: 20, paddingVertical: 7, paddingHorizontal: 14, marginRight: 8 },
-  tipoOn: { backgroundColor: colors.azulMarino, borderColor: colors.azulMarino },
+  tipoOn: { backgroundColor: colors.nav, borderColor: colors.azulMarino },
   tipoTxt: { color: colors.grisTexto, fontWeight: '600', fontSize: 13 },
   tipoTxtOn: { color: colors.blanco },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },

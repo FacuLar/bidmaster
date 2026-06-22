@@ -6,6 +6,7 @@ import { Boton, Tarjeta } from '../components/ui';
 import { conectarSocket } from '../api/socket';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /**
  * Sala de subasta EN VIVO — modelo SECUENCIAL: la subasta remata un ítem por vez
@@ -14,6 +15,8 @@ import colors from '../theme/colors';
  * que te interesan e irte a pagar cuando quieras.
  */
 export default function SubastaEnVivoScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { subasta, medio } = route.params;
   const idSubasta = subasta.id_subasta || subasta.id;
   const { usuario } = useAuth();
@@ -191,13 +194,13 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
   center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: colors.grisPerla },
   emoji: { fontSize: 56, marginBottom: 10 },
   msgTit: { fontSize: 18, fontWeight: '800', color: colors.azulMarino, textAlign: 'center', marginBottom: 6 },
   msg: { color: colors.grisTexto, textAlign: 'center', marginTop: 6, marginBottom: 16, lineHeight: 20 },
-  live: { backgroundColor: colors.azulMarino, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  live: { backgroundColor: colors.nav, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   liveTxt: { color: colors.blanco, fontWeight: '800' },
   timer: { color: colors.dorado, fontWeight: '900', fontSize: 16 },
   orden: { color: colors.naranja, fontWeight: '800', marginBottom: 8 },

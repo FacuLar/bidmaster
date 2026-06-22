@@ -5,6 +5,7 @@ import { Boton, Campo } from '../components/ui';
 import { AuthAPI } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 // Validación de formato (igual que el backend, para avisar antes de enviar).
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -14,6 +15,8 @@ const esDomicilioValido = (dir) => (dir || '').trim().length >= 5 && /\d/.test(d
 
 /* Etapa 1 del registro. Incluye la CORRECCIÓN DE DISEÑO: campo "Mail". */
 export default function RegistroScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { entrarComoInvitado } = useAuth();
   const [form, setForm] = useState({
     nombre: '', apellido: '', email: '', domicilio_legal: '', pais_origen: '',
@@ -140,7 +143,7 @@ export default function RegistroScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
   label: { color: colors.azulMarino, fontWeight: '600', marginBottom: 6, fontSize: 13 },
   dniRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },

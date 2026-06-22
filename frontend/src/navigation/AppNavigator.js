@@ -1,11 +1,11 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
-import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -38,12 +38,14 @@ const tabIcon = (base) => ({ focused, color, size }) => (
 
 /* Tabs principales una vez logueado: Catálogo, Billetera, Perfil. */
 function MainTabs() {
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false, // cada pantalla renderiza su propio header navy (ver components/ui Header)
         tabBarActiveTintColor: colors.naranja,
         tabBarInactiveTintColor: colors.grisTexto,
+        tabBarStyle: { backgroundColor: colors.superficie, borderTopColor: colors.borde },
       }}
     >
       <Tab.Screen name="Catálogo" component={HomeScreen}
@@ -58,6 +60,7 @@ function MainTabs() {
 
 export default function AppNavigator() {
   const { usuario, invitado, cargando } = useAuth();
+  const { colors, dark } = useTheme();
   if (cargando) return null;
   const dentro = usuario || invitado; // sesión completa O invitado (no validado)
 
@@ -66,12 +69,19 @@ export default function AppNavigator() {
   // quedar "atrapado" en Completar Registro después de activar la cuenta.
   const sesionKey = usuario ? 'auth' : invitado ? 'guest' : 'anon';
 
+  // Tema de navegación: fondo de las pantallas según el modo (evita el flash blanco).
+  const base = dark ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: { ...base.colors, background: colors.grisPerla, card: colors.nav, text: colors.blanco, border: colors.borde, primary: colors.naranja },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
       <Stack.Navigator
         key={sesionKey}
         screenOptions={{
-          headerStyle: { backgroundColor: colors.azulMarino },
+          headerStyle: { backgroundColor: colors.nav },
           headerTintColor: colors.blanco,
         }}
       >

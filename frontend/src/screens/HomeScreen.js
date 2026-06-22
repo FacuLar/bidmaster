@@ -8,12 +8,15 @@ import { Tarjeta, Boton, Header, BannerInvitado, Insignia, EmptyState, Chip } fr
 import { SubastaAPI } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { CATEGORIAS, TAGS, USOS, labelUso, norm } from '../theme/taxonomia';
 
 // Texto "Común o superior" para la categoría requerida (igual al wireframe).
 const capit = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 export default function HomeScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { usuario, esInvitado, invitado } = useAuth();
   const [moneda, setMoneda] = useState('ARS');
   const [subastas, setSubastas] = useState([]);
@@ -241,16 +244,16 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.azulMarino },
+const crearStyles = (colors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.nav },
   container: { flex: 1, backgroundColor: colors.grisPerla },
-  tabs: { flexDirection: 'row', backgroundColor: colors.blanco, paddingHorizontal: 16 },
+  tabs: { flexDirection: 'row', backgroundColor: colors.superficie, paddingHorizontal: 16 },
   tab: { marginRight: 28, paddingVertical: 12, alignItems: 'center' },
   tabTxt: { color: colors.grisTexto, fontWeight: '600' },
   tabActivo: { color: colors.azulMarino, fontWeight: '800' },
   tabLinea: { height: 3, backgroundColor: colors.naranja, width: '100%', marginTop: 6, borderRadius: 2 },
 
-  buscador: { backgroundColor: colors.blanco, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.grisBorde },
+  buscador: { backgroundColor: colors.superficie, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.grisBorde },
   searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.grisPerla, borderRadius: 10, paddingHorizontal: 10 },
   lupa: { fontSize: 15, marginRight: 6 },
   searchInput: { flex: 1, paddingVertical: 9, fontSize: 14, color: colors.textoOscuro },

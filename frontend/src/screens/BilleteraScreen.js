@@ -8,6 +8,7 @@ import { Tarjeta, Boton, Campo, Insignia, Header, BannerInvitado } from '../comp
 import { PagoAPI } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 // Formatea el número de tarjeta en grupos de 4 dígitos (máx 19 dígitos).
 const formatTarjeta = (v) => v.replace(/\D/g, '').slice(0, 19).replace(/(.{4})/g, '$1 ').trim();
@@ -35,6 +36,8 @@ const FORM_VACIO = {
 };
 
 export default function BilleteraScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { esInvitado } = useAuth();
   const [medios, setMedios] = useState([]);
   const [modal, setModal] = useState(false);
@@ -266,8 +269,8 @@ export default function BilleteraScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.azulMarino },
+const crearStyles = (colors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.nav },
   container: { flex: 1, backgroundColor: colors.grisPerla },
   h1: { fontSize: 22, fontWeight: '800', color: colors.azulMarino, marginBottom: 8 },
   h2: { fontSize: 18, fontWeight: '800', color: colors.azulMarino, marginBottom: 10 },
@@ -286,7 +289,7 @@ const styles = StyleSheet.create({
   lbl: { color: colors.azulMarino, fontWeight: '600', marginBottom: 6 },
   selector: { flexDirection: 'row', marginBottom: 12 },
   chip: { borderWidth: 1, borderColor: colors.grisBorde, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8 },
-  chipActivo: { backgroundColor: colors.azulMarino, borderColor: colors.azulMarino },
+  chipActivo: { backgroundColor: colors.nav, borderColor: colors.azulMarino },
   chipTxt: { color: colors.grisTexto, fontWeight: '600' },
   chipTxtActivo: { color: colors.blanco },
 });

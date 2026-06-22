@@ -3,10 +3,13 @@ import { View, Text, StyleSheet, Alert } from 'react-native';
 import { Boton, Campo, Tarjeta } from '../components/ui';
 import { AuthAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /* Recuperación de contraseña en 2 pasos: pedir el código y luego setear la clave.
    Sin servidor de mail, el código se muestra en la app (igual que en el registro). */
 export default function RecuperarPasswordScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const [paso, setPaso] = useState(1); // 1: email · 2: código + nueva clave
   const [email, setEmail] = useState('');
   const [codigo, setCodigo] = useState('');
@@ -82,7 +85,7 @@ export default function RecuperarPasswordScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla, padding: 22, justifyContent: 'center' },
   texto: { color: colors.grisTexto, marginBottom: 20, lineHeight: 20 },
   mailTit: { color: colors.verde, fontWeight: '800', fontSize: 15, marginBottom: 4 },

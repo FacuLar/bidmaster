@@ -4,9 +4,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Tarjeta } from '../components/ui';
 import { VendedorAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /* Depósito físico de la pieza + póliza de seguro contratada por la empresa. */
 export default function UbicacionSeguroScreen({ route }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { id } = route.params;
   const [data, setData] = useState(null);
 
@@ -34,7 +37,7 @@ export default function UbicacionSeguroScreen({ route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
   h: { fontWeight: '800', color: colors.azulMarino, marginBottom: 6 },
   v: { color: colors.textoOscuro, marginVertical: 2 },

@@ -6,8 +6,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Boton, Campo } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 export default function LoginScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -77,8 +80,8 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.azulMarino, justifyContent: 'center', padding: 22 },
+const crearStyles = (colors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.nav, justifyContent: 'center', padding: 22 },
   header: { alignItems: 'center', marginBottom: 26 },
   logoBadge: {
     width: 92, height: 92, borderRadius: 46, backgroundColor: colors.azulClaro,
@@ -90,7 +93,7 @@ const styles = StyleSheet.create({
   logo: { color: colors.blanco, fontSize: 26, fontWeight: '900', letterSpacing: 3 },
   tagline: { color: colors.dorado, fontSize: 12.5, fontWeight: '600', marginTop: 5, letterSpacing: 0.5 },
   card: {
-    backgroundColor: colors.blanco, borderRadius: 20, padding: 24,
+    backgroundColor: colors.superficie, borderRadius: 20, padding: 24,
     shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10,
   },
   titulo: { fontSize: 21, fontWeight: '800', color: colors.azulMarino, textAlign: 'center' },

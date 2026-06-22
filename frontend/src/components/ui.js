@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors, { radius, sombra } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /* ============================================================================
  * Sistema de componentes de UI de BidMaster.
@@ -15,10 +16,12 @@ import colors, { radius, sombra } from '../theme/colors';
 export function Boton({
   title, onPress, variant = 'primary', size = 'md', icon, loading, disabled, style, textStyle,
 }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const off = disabled || loading;
   const paletas = {
     primary: { bg: colors.naranja, fg: colors.blanco, bgOff: '#F5B98A' },
-    dark: { bg: colors.azulMarino, fg: colors.blanco, bgOff: '#3E4A6B' },
+    dark: { bg: colors.nav, fg: colors.blanco, bgOff: '#3E4A6B' },
     secondary: { bg: colors.grisPerla, fg: colors.azulMarino, bgOff: '#E5E7EB' },
     outline: { bg: 'transparent', fg: colors.azulMarino, bgOff: 'transparent' },
     ghost: { bg: 'transparent', fg: colors.naranja, bgOff: 'transparent' },
@@ -59,6 +62,8 @@ export function Boton({
 /* Header oscuro reutilizable (navy) con título, subtítulo y campana de avisos.
    Lleva una línea de acento dorada inferior para dar prolijidad. */
 export function Header({ titulo, subtitulo, onAvisos, conAviso }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   return (
     <View style={styles.headerWrap}>
       <View style={styles.header}>
@@ -80,6 +85,8 @@ export function Header({ titulo, subtitulo, onAvisos, conAviso }) {
 
 /* Input con label, estado de foco, y soporte opcional de error/hint. */
 export function Campo({ label, error, hint, style, onFocus, onBlur, ...props }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const [focus, setFocus] = useState(false);
   return (
     <View style={{ marginBottom: 14 }}>
@@ -104,6 +111,8 @@ export function Campo({ label, error, hint, style, onFocus, onBlur, ...props }) 
 
 /* Tarjeta blanca. Si recibe onPress, se comporta como tarjeta presionable. */
 export function Tarjeta({ children, style, onPress }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   if (onPress) {
     return (
       <TouchableOpacity style={[styles.tarjeta, style]} onPress={onPress} activeOpacity={0.9}>
@@ -116,6 +125,8 @@ export function Tarjeta({ children, style, onPress }) {
 
 /* Banner de modo invitado: recordatorio de validar la cuenta para participar. */
 export function BannerInvitado({ onValidar }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   return (
     <TouchableOpacity style={styles.banner} onPress={onValidar} activeOpacity={0.9}>
       <Text style={styles.bannerTxt}>🔒 Estás como invitado. Validá tu cuenta para participar.</Text>
@@ -126,7 +137,9 @@ export function BannerInvitado({ onValidar }) {
 
 /* Insignia de categoría / estado.
    variant: 'solid' (default, usa `color` de fondo) | 'soft' (tint suave) | 'outline'. */
-export function Insignia({ texto, color = colors.dorado, variant = 'solid', dot }) {
+export function Insignia({ texto, color = '#D4AF37', variant = 'solid', dot }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   if (variant === 'soft' || variant === 'outline') {
     const esSoft = variant === 'soft';
     return (
@@ -141,7 +154,7 @@ export function Insignia({ texto, color = colors.dorado, variant = 'solid', dot 
   }
   return (
     <View style={[styles.insignia, { backgroundColor: color }]}>
-      {dot ? <View style={[styles.insigniaDot, { backgroundColor: colors.blanco }]} /> : null}
+      {dot ? <View style={[styles.insigniaDot, { backgroundColor: colors.superficie }]} /> : null}
       <Text style={[styles.insigniaTexto, { color: colors.blanco }]}>{texto}</Text>
     </View>
   );
@@ -149,6 +162,8 @@ export function Insignia({ texto, color = colors.dorado, variant = 'solid', dot 
 
 /* Chip seleccionable (para selectores tipo "Tipo / Moneda / Tabs"). */
 export function Chip({ label, activo, onPress }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   return (
     <TouchableOpacity
       style={[styles.chip, activo && styles.chipActivo]}
@@ -163,6 +178,8 @@ export function Chip({ label, activo, onPress }) {
 /* Selector de medio de pago reutilizable (entrar a subasta, pagar pieza/multa).
    Muestra saldo, marca "sin fondos" si no cubre `montoMinimo` y resalta el elegido. */
 export function SelectorMedios({ medios, elegido, onElegir, montoMinimo = 0, simbolo = '$' }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   if (!medios || medios.length === 0) {
     return (
       <View style={styles.selMedioVacio}>
@@ -197,11 +214,15 @@ export function SelectorMedios({ medios, elegido, onElegir, montoMinimo = 0, sim
 
 /* Separador horizontal sutil. */
 export function Divider({ style }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   return <View style={[styles.divider, style]} />;
 }
 
 /* Estado vacío (listas sin datos), con ícono opcional. */
 export function EmptyState({ icon = '📭', titulo, texto }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   return (
     <View style={styles.empty}>
       <Text style={styles.emptyIcon}>{icon}</Text>
@@ -219,13 +240,13 @@ function tint(hex) {
   return `rgb(${mix(m[1])}, ${mix(m[2])}, ${mix(m[3])})`;
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   boton: {
     borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginVertical: 6,
   },
   botonTexto: { fontWeight: '700', letterSpacing: 0.3 },
 
-  headerWrap: { backgroundColor: colors.azulMarino },
+  headerWrap: { backgroundColor: colors.nav },
   header: {
     paddingHorizontal: 18, paddingTop: 18, paddingBottom: 16,
     flexDirection: 'row', alignItems: 'center',
@@ -254,7 +275,7 @@ const styles = StyleSheet.create({
   label: { color: colors.azulMarino, fontWeight: '600', marginBottom: 6, fontSize: 13 },
   input: {
     borderWidth: 1.5, borderColor: colors.grisBorde, borderRadius: radius.md,
-    paddingHorizontal: 13, paddingVertical: 11, backgroundColor: colors.blanco,
+    paddingHorizontal: 13, paddingVertical: 11, backgroundColor: colors.superficie,
     fontSize: 15, color: colors.textoOscuro,
   },
   inputFocus: { borderColor: colors.naranja, backgroundColor: '#FFFDFB' },
@@ -263,7 +284,7 @@ const styles = StyleSheet.create({
   hintTxt: { color: colors.grisTexto, fontSize: 11.5, marginTop: 5 },
 
   tarjeta: {
-    backgroundColor: colors.blanco, borderRadius: radius.lg, padding: 16, marginVertical: 8,
+    backgroundColor: colors.superficie, borderRadius: radius.lg, padding: 16, marginVertical: 8,
     borderWidth: 1, borderColor: '#EEF1F5',
     ...sombra(2),
   },
@@ -277,16 +298,16 @@ const styles = StyleSheet.create({
 
   chip: {
     borderWidth: 1, borderColor: colors.grisBorde, borderRadius: radius.pill,
-    paddingVertical: 7, paddingHorizontal: 15, marginRight: 8, backgroundColor: colors.blanco,
+    paddingVertical: 7, paddingHorizontal: 15, marginRight: 8, backgroundColor: colors.superficie,
   },
-  chipActivo: { backgroundColor: colors.azulMarino, borderColor: colors.azulMarino },
+  chipActivo: { backgroundColor: colors.nav, borderColor: colors.azulMarino },
   chipTxt: { color: colors.grisTexto, fontWeight: '600', fontSize: 13 },
   chipTxtActivo: { color: colors.blanco },
 
   divider: { height: 1, backgroundColor: colors.grisBorde, marginVertical: 12 },
 
   selMedio: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.blanco,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.superficie,
     borderRadius: 12, padding: 13, marginBottom: 8, borderWidth: 1.5, borderColor: colors.grisBorde,
   },
   selMedioSel: { borderColor: colors.naranja, backgroundColor: '#FFFDFB' },

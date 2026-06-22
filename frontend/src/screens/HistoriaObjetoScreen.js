@@ -6,11 +6,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Boton, SelectorMedios } from '../components/ui';
 import { SubastaAPI, PagoAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 const ANCHO = Dimensions.get('window').width - 36; // ancho útil (padding 18 x2)
 
 /* Detalle/historia del objeto + elección del medio de pago antes de entrar. */
 export default function HistoriaObjetoScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { pieza, subasta } = route.params;
   const idSubasta = subasta.id_subasta || subasta.id;
   const moneda = subasta.moneda;
@@ -116,7 +119,7 @@ export default function HistoriaObjetoScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
   carrusel: { width: ANCHO, height: 230, borderRadius: 12 },
   img: { width: ANCHO, height: 230, borderRadius: 12, backgroundColor: colors.grisBorde },
@@ -128,7 +131,7 @@ const styles = StyleSheet.create({
   titulo: { fontSize: 20, fontWeight: '800', color: colors.azulMarino, marginTop: 6 },
   artista: { fontWeight: '700', color: colors.textoOscuro, marginTop: 4 },
   meta: { color: colors.grisTexto, marginTop: 2 },
-  box: { backgroundColor: colors.blanco, borderRadius: 12, padding: 14, marginVertical: 14 },
+  box: { backgroundColor: colors.superficie, borderRadius: 12, padding: 14, marginVertical: 14 },
   historia: { color: colors.textoOscuro, lineHeight: 21 },
   precio: { fontWeight: '700', color: colors.azulMarino, marginBottom: 12 },
   lbl: { color: colors.azulMarino, fontWeight: '700', marginBottom: 8 },

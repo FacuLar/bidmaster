@@ -3,9 +3,12 @@ import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
 import { Tarjeta, Boton, SelectorMedios } from '../components/ui';
 import { PagoAPI, UsuarioAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /* Aviso de multa por incumplimiento de pago (10% + 72hs) y pago de la misma. */
 export default function AvisoMultaScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { multa } = route.params || {};
   const monto = Number(multa?.monto_multa) || 0;
   const [medios, setMedios] = useState([]);
@@ -79,7 +82,7 @@ export default function AvisoMultaScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
   header: { backgroundColor: '#FEE2E2', padding: 18 },
   headerTxt: { color: colors.rojo, fontSize: 20, fontWeight: '800' },

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Alert,
+  View, Text, StyleSheet, ScrollView, Alert, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import { Tarjeta, Boton, Header, BannerInvitado, Insignia, Divider, EmptyState }
 import { UsuarioAPI } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 const capit = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 const CATEGORIAS = ['comun', 'especial', 'plata', 'oro', 'platino'];
@@ -18,6 +19,8 @@ const colorCategoria = {
 const fmt = (n) => `$${Number(n || 0).toLocaleString()}`;
 
 export default function PerfilScreen({ navigation }) {
+  const { colors, dark, toggleTema } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { usuario, esInvitado, invitado, logout } = useAuth();
   const [metricas, setMetricas] = useState(null);
   const [multa, setMulta] = useState(null);
@@ -149,6 +152,14 @@ export default function PerfilScreen({ navigation }) {
             ))
           : <EmptyState icon="🪙" titulo="Todavía sin victorias" texto="Cuando ganes una subasta, tus piezas aparecen acá." />}
 
+        {/* Ajustes */}
+        <Text style={styles.subt}>Ajustes</Text>
+        <Tarjeta style={styles.temaRow}>
+          <Text style={styles.temaTxt}>🌙 Modo oscuro</Text>
+          <Switch value={dark} onValueChange={toggleTema}
+            trackColor={{ true: colors.naranja, false: colors.grisBorde }} thumbColor={colors.superficie} />
+        </Tarjeta>
+
         {/* Acciones */}
         <Text style={styles.subt}>Acciones</Text>
         <Boton title="VER MIS PUJAS" icon="📜" variant="dark" onPress={() => navigation.navigate('MisPujas')} />
@@ -160,10 +171,12 @@ export default function PerfilScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.azulMarino },
+const crearStyles = (colors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.nav },
   container: { flex: 1, backgroundColor: colors.grisPerla },
   linea: { color: colors.textoOscuro, marginVertical: 3 },
+  temaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  temaTxt: { color: colors.textoOscuro, fontWeight: '700', fontSize: 15 },
 
   idCard: { paddingVertical: 18 },
   idRow: { flexDirection: 'row', alignItems: 'center' },
@@ -179,7 +192,7 @@ const styles = StyleSheet.create({
   subt: { fontWeight: '800', color: colors.azulMarino, marginTop: 18, marginBottom: 8, fontSize: 15 },
   statsGrid: { flexDirection: 'row', marginHorizontal: -5 },
   stat: {
-    flex: 1, backgroundColor: colors.blanco, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 8,
+    flex: 1, backgroundColor: colors.superficie, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 8,
     marginHorizontal: 5, marginBottom: 10, alignItems: 'center', borderWidth: 1, borderColor: '#EEF1F5',
   },
   statIcon: { fontSize: 20, marginBottom: 4 },

@@ -3,11 +3,14 @@ import { View, Text, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'r
 import { Boton, Campo, Tarjeta } from '../components/ui';
 import { AuthAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /* Permite retomar la validación de una cuenta ya registrada (etapa 1) cuando el
    usuario cerró sesión: ingresa su email y vuelve a la pantalla para generar la
    clave. Resuelve el caso "salí y no puedo volver a validar". */
 export default function ValidarCuentaScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const [email, setEmail] = useState('');
   const [cargando, setCargando] = useState(false);
 
@@ -53,7 +56,7 @@ export default function ValidarCuentaScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla, justifyContent: 'center', padding: 22 },
   titulo: { fontSize: 20, fontWeight: '800', color: colors.azulMarino, marginBottom: 6 },
   sub: { color: colors.grisTexto, fontSize: 13, lineHeight: 19, marginBottom: 16 },

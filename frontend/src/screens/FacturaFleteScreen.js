@@ -3,9 +3,12 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Tarjeta } from '../components/ui';
 import { VendedorAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /* Factura del flete por devolución del bien con cargo al vendedor (#13). */
 export default function FacturaFleteScreen({ route }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { id } = route.params;
   const [factura, setFactura] = useState(null);
   const [error, setError] = useState(null);
@@ -39,7 +42,7 @@ export default function FacturaFleteScreen({ route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla, justifyContent: 'flex-start' },
   header: { backgroundColor: colors.rojo, padding: 18 },
   headerTxt: { color: colors.blanco, fontWeight: '800', fontSize: 16 },

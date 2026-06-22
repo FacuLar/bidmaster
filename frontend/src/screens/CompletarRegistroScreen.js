@@ -4,11 +4,14 @@ import { Boton, Campo, Tarjeta } from '../components/ui';
 import { AuthAPI } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /* Etapa 2: el usuario (invitado) espera la aprobación de la verificación externa
    y recién entonces genera su clave personal, validándola con el código que le
    llegó por mail al habilitarse la cuenta. NO se aprueba al instante. */
 export default function CompletarRegistroScreen({ route }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { guardarSesion, invitado } = useAuth();
   // Datos de la solicitud: se capturan UNA vez al montar. Si se derivaran en vivo
   // de `invitado`, al activar la cuenta (que limpia el invitado) quedarían vacíos
@@ -129,7 +132,7 @@ export default function CompletarRegistroScreen({ route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla, padding: 22, justifyContent: 'center' },
   ok: { color: colors.verde, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
   cat: { color: colors.azulMarino, fontWeight: '700', marginBottom: 18, textAlign: 'center' },

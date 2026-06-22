@@ -1,50 +1,86 @@
 /**
  * Paleta de colores — concepto "Trust & Action" (Primera Entrega).
- * Trazabilidad directa con la justificación psicológica del diseño.
- *
- * Se mantienen los tokens originales y se agregan variantes (pressed, tints,
- * superficies) para lograr una UI más profesional y consistente.
+ * Soporta modo claro y oscuro. Cada token mantiene su SEMÁNTICA en ambos modos:
+ *  - `nav`        → fondo de barras/headers (siempre navy oscuro).
+ *  - `superficie` → fondo de tarjetas/inputs.
+ *  - `fondo`/`grisPerla` → fondo general de pantalla.
+ *  - `azulMarino`/`textoOscuro` → texto principal (oscuro en claro, claro en oscuro).
+ *  - `blanco` → texto sobre superficies oscuras (siempre blanco).
  */
-export const colors = {
-  // --- Marca / base (originales) ---
-  azulMarino: '#0A192F',   // confianza / estabilidad (navbars, headers, fondos)
-  naranja: '#FF6B00',      // acción / urgencia (botones críticos: Pujar, Confirmar)
-  dorado: '#D4AF37',       // exclusividad / estatus (insignias, alto valor)
-  verde: '#10B981',        // éxito (oferta superada, subasta ganada)
-  rojo: '#EF4444',         // alerta (multas, errores)
-  blanco: '#FFFFFF',       // fondos / tarjetas
+export const lightColors = {
+  // Marca / base
+  azulMarino: '#0A192F',   // texto principal (títulos)
+  naranja: '#FF6B00',
+  dorado: '#D4AF37',
+  verde: '#10B981',
+  rojo: '#EF4444',
+  blanco: '#FFFFFF',       // texto sobre fondos oscuros
   grisPerla: '#F3F4F6',    // fondo general
-  grisTexto: '#6B7280',    // texto secundario
+  grisTexto: '#6B7280',
   grisBorde: '#E5E7EB',
-  azulClaro: '#172A46',    // tarjetas sobre fondo azul
-  textoOscuro: '#111827',
+  azulClaro: '#172A46',
+  textoOscuro: '#111827',  // texto principal
 
-  // --- Variantes nuevas (profundidad y estados) ---
-  azulProfundo: '#060F22', // base para degradados / splash
-  azulMedio: '#13294B',    // gradiente intermedio del header
-  naranjaOscuro: '#E25C00', // estado "pressed" del botón de acción
-  naranjaSuave: '#FFF1E8', // tint para fondos/realces naranjas
+  // Superficies / navegación
+  nav: '#0A192F',          // headers, tab bar, botones oscuros, splash/login
+  superficie: '#FFFFFF',   // tarjetas / inputs
+  fondo: '#F1F4F8',
+
+  // Variantes
+  azulProfundo: '#060F22',
+  azulMedio: '#13294B',
+  naranjaOscuro: '#E25C00',
+  naranjaSuave: '#FFF1E8',
   doradoOscuro: '#B8941F',
-  doradoSuave: '#FBF4DC',  // tint de insignias premium
+  doradoSuave: '#FBF4DC',
   verdeOscuro: '#0E9E6E',
   verdeSuave: '#E7F8F1',
   rojoSuave: '#FDECEC',
   azulInfo: '#3B82F6',
   azulInfoSuave: '#EAF1FE',
-
-  // --- Superficies y texto ---
-  fondo: '#F1F4F8',        // fondo general (levemente más frío y moderno)
-  superficie: '#FFFFFF',
-  textoSuave: '#9CA3AF',   // placeholders / texto terciario
+  textoSuave: '#9CA3AF',
   borde: '#E5E7EB',
   bordeFuerte: '#CBD5E1',
 };
 
-/* Escala de espaciado y radios para mantener consistencia entre pantallas. */
+export const darkColors = {
+  azulMarino: '#DCE6F2',   // texto principal (claro sobre oscuro)
+  naranja: '#FF7A1A',
+  dorado: '#E2C34F',
+  verde: '#34D399',
+  rojo: '#F87171',
+  blanco: '#FFFFFF',
+  grisPerla: '#0E1525',    // fondo general (oscuro)
+  grisTexto: '#9AA6B8',
+  grisBorde: '#2A3550',
+  azulClaro: '#22304A',
+  textoOscuro: '#E8EDF4',  // texto principal (claro)
+
+  nav: '#0A192F',          // headers/tab bar quedan navy en ambos modos
+  superficie: '#18202F',   // tarjetas / inputs (oscuro)
+  fondo: '#0B1220',
+
+  azulProfundo: '#060F22',
+  azulMedio: '#16233B',
+  naranjaOscuro: '#E25C00',
+  naranjaSuave: '#3A2A1E',
+  doradoOscuro: '#B8941F',
+  doradoSuave: '#2E2913',
+  verdeOscuro: '#34D399',
+  verdeSuave: '#12302A',
+  rojoSuave: '#3A1E22',
+  azulInfo: '#60A5FA',
+  azulInfoSuave: '#15233B',
+  textoSuave: '#6B7686',
+  borde: '#2A3550',
+  bordeFuerte: '#3A4761',
+};
+
+/* Escala de espaciado y radios. */
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 export const radius = { sm: 8, md: 12, lg: 16, xl: 22, pill: 999 };
 
-/* Sombra reutilizable (iOS + Android) según nivel de elevación. */
+/* Sombra reutilizable según nivel de elevación. */
 export const sombra = (nivel = 1) => ({
   shadowColor: '#0A192F',
   shadowOpacity: 0.06 + nivel * 0.03,
@@ -53,4 +89,5 @@ export const sombra = (nivel = 1) => ({
   elevation: nivel + 1,
 });
 
-export default colors;
+// Export por defecto = paleta clara (para usos estáticos / fallback).
+export default lightColors;

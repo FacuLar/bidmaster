@@ -4,11 +4,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Tarjeta, Insignia, Boton, EmptyState } from '../components/ui';
 import { UsuarioAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 const fmt = (n) => `$${Number(n || 0).toLocaleString()}`;
 
 /* Muestra las piezas ganadas y su estado de pago (pendiente / pagada). */
 export default function MisPujasScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const [items, setItems] = useState([]);
 
   const cargar = useCallback(async () => {
@@ -64,7 +67,7 @@ export default function MisPujasScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
   t: { fontWeight: '700', color: colors.azulMarino, marginTop: 8 },
   v: { fontWeight: '600', color: colors.grisTexto, marginVertical: 4, fontSize: 13 },

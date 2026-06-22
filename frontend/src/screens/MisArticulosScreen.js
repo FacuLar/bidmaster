@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Tarjeta, Insignia, Boton } from '../components/ui';
 import { VendedorAPI } from '../api/endpoints';
 import colors from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 const colorEstado = {
   'En revisión': colors.naranja,
@@ -19,6 +20,8 @@ const colorEstado = {
 
 /* Lista los artículos propuestos y permite avanzar el trámite según su estado. */
 export default function MisArticulosScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const [items, setItems] = useState([]);
 
   const cargar = useCallback(async () => {
@@ -150,7 +153,7 @@ export default function MisArticulosScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const crearStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.grisPerla },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   t: { fontWeight: '800', color: colors.azulMarino, flex: 1, marginRight: 8 },
