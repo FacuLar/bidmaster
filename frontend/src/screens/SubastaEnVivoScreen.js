@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { Boton, Tarjeta } from '../components/ui';
 import { conectarSocket } from '../api/socket';
+import { SubastaAPI } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
@@ -31,6 +32,14 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
   const [pujando, setPujando] = useState(false);
   const [segundos, setSegundos] = useState(null);
   const [ganados, setGanados] = useState([]);
+  const [catalogo, setCatalogo] = useState([]); // todos los ítems de la subasta
+
+  // Catálogo completo de la subasta (para mostrar que tiene varios ítems).
+  useEffect(() => {
+    SubastaAPI.catalogo(idSubasta)
+      .then((c) => setCatalogo((c.piezas || []).slice().sort((a, b) => a.nro_pieza - b.nro_pieza)))
+      .catch(() => {});
+  }, [idSubasta]);
 
   const socketRef = useRef(null);
   const cierreTsRef = useRef(null);
@@ -127,18 +136,41 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
     </Tarjeta>
   ) : null);
 
+  // Tira con TODOS los ítems de la subasta (deja claro que tiene varios).
+  const CatalogoStrip = () => (catalogo.length > 0 ? (
+    <View style={styles.catWrap}>
+      <Text style={styles.catTit}>Catálogo · {catalogo.length} ítems (se rematan en orden)</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {catalogo.map((p, i) => {
+          const actual = item && String(p.id_pieza) === String(item.id_pieza);
+          const vendido = p.estado !== 'en_subasta' || (item && (i + 1) < item.orden);
+          return (
+            <View key={p.id_pieza} style={[styles.catItem, actual && styles.catItemActual, vendido && styles.catItemVendido]}>
+              <Text style={styles.catNum}>#{i + 1}</Text>
+              <Text style={styles.catNom} numberOfLines={1}>{p.titulo}</Text>
+              <Text style={styles.catEst}>{actual ? '🔴 ahora' : vendido ? '✓ rematado' : '⏳ en cola'}</Text>
+            </View>
+          );
+        })}
+      </ScrollView>
+    </View>
+  ) : null);
+
   // --- Estados no "en curso" ---
   if (estado === 'conectando') {
     return <View style={styles.center}><ActivityIndicator size="large" color={colors.naranja} /><Text style={styles.msg}>Conectando a la sala…</Text></View>;
   }
   if (estado === 'programada') {
     return (
-      <View style={styles.center}>
-        <Text style={styles.emoji}>⏳</Text>
-        <Text style={styles.msgTit}>La subasta todavía no comenzó</Text>
-        <Text style={styles.msg}>Quedate en la sala: cuando arranque, vas a ver el ítem que se está rematando.</Text>
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={styles.emoji}>⏳</Text>
+          <Text style={styles.msgTit}>La subasta arranca en instantes…</Text>
+          <Text style={styles.msg}>Tiene {catalogo.length} ítems y se rematan de a uno, en orden.</Text>
+        </View>
+        <CatalogoStrip />
         <Boton title="Salir" variant="secondary" onPress={() => navigation.goBack()} />
-      </View>
+      </ScrollView>
     );
   }
   if (estado === 'finalizada') {
@@ -155,6 +187,7 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
   // --- En curso: ítem actual ---
   return (
     <ScrollView style={styles.container}>
+      <CatalogoStrip />
       <View style={styles.live}>
         <Text style={styles.liveTxt}>🔴 EN VIVO · Subasta #{idSubasta}</Text>
         {segundos != null && <Text style={styles.timer}>⏱ {segundos}s</Text>}
@@ -214,6 +247,14 @@ const crearStyles = (colors) => StyleSheet.create({
   input: { borderWidth: 1, borderColor: colors.grisBorde, borderRadius: 10, width: '100%', padding: 12, textAlign: 'center', fontSize: 18, marginTop: 10, backgroundColor: '#fff' },
   rango: { color: colors.grisTexto, fontSize: 12, marginTop: 8, textAlign: 'center' },
   nota: { color: colors.grisTexto, fontSize: 12, textAlign: 'center', marginTop: 8 },
+  catWrap: { backgroundColor: colors.superficie, paddingVertical: 10, paddingLeft: 12, borderBottomWidth: 1, borderBottomColor: colors.borde },
+  catTit: { color: colors.grisTexto, fontSize: 11.5, fontWeight: '700', marginBottom: 8 },
+  catItem: { width: 120, backgroundColor: colors.grisPerla, borderRadius: 10, padding: 8, marginRight: 8, borderWidth: 1, borderColor: colors.borde },
+  catItemActual: { borderColor: colors.naranja, borderWidth: 2, backgroundColor: colors.naranjaSuave },
+  catItemVendido: { opacity: 0.5 },
+  catNum: { color: colors.azulMarino, fontWeight: '900', fontSize: 12 },
+  catNom: { color: colors.textoOscuro, fontSize: 11.5, fontWeight: '600', marginTop: 2 },
+  catEst: { color: colors.grisTexto, fontSize: 10.5, marginTop: 3, fontWeight: '700' },
   ganados: { margin: 14, marginBottom: 0, borderColor: colors.verde, borderWidth: 1 },
   ganadosTit: { color: colors.verde, fontWeight: '800', fontSize: 15 },
   ganadosTxt: { color: colors.textoOscuro, fontSize: 13, marginTop: 2, marginBottom: 4 },

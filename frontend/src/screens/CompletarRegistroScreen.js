@@ -9,7 +9,7 @@ import { useTheme } from '../theme/ThemeContext';
 /* Etapa 2: el usuario (invitado) espera la aprobación de la verificación externa
    y recién entonces genera su clave personal, validándola con el código que le
    llegó por mail al habilitarse la cuenta. NO se aprueba al instante. */
-export default function CompletarRegistroScreen({ route }) {
+export default function CompletarRegistroScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = React.useMemo(() => crearStyles(colors), [colors]);
   const { guardarSesion, invitado } = useAuth();
@@ -36,10 +36,10 @@ export default function CompletarRegistroScreen({ route }) {
         if (!activo) return;
         setEstado(r.estado);
         setCategoria(r.categoria_asignada);
-        // El "mail" se simula en la app: al aprobar, mostramos y precargamos el código.
+        // Se simula el "mail": mostramos el código en una tarjeta, pero el usuario
+        // lo escribe a mano (no se precarga el campo).
         if (r.estado === 'aprobada' && r.codigo_validacion) {
           setCodigoMail(r.codigo_validacion);
-          setCodigo((c) => c || String(r.codigo_validacion));
         }
         if (r.estado === 'pendiente') {
           timer.current = setTimeout(consultar, 4000);
@@ -74,10 +74,13 @@ export default function CompletarRegistroScreen({ route }) {
     }
   }
 
+  const salir = () => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Login'));
+
   if (!id_solicitud) {
     return (
       <View style={styles.container}>
         <Text style={styles.rechazo}>No encontramos tu solicitud. Volvé a registrarte.</Text>
+        <Boton title="Volver" variant="secondary" onPress={salir} />
       </View>
     );
   }
@@ -86,6 +89,7 @@ export default function CompletarRegistroScreen({ route }) {
     return (
       <View style={styles.container}>
         <Text style={styles.rechazo}>Tu solicitud fue rechazada por la verificación externa.</Text>
+        <Boton title="Volver" variant="secondary" onPress={salir} />
       </View>
     );
   }
@@ -101,6 +105,7 @@ export default function CompletarRegistroScreen({ route }) {
           mail con tu código de validación cuando tu cuenta sea habilitada.
         </Text>
         <Text style={styles.subtexto}>Podés seguir mirando las subastas como invitado mientras tanto.</Text>
+        <Boton title="Salir" variant="secondary" onPress={salir} />
       </View>
     );
   }

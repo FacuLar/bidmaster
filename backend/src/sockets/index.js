@@ -174,6 +174,20 @@ function initSockets(io, app) {
       salasUsuarios[usuario.id] = id_subasta;
       socket.emit('sala_unida', { id_subasta });
 
+      // Auto-arranque: al entrar el primer usuario, si la subasta no está corriendo
+      // y no terminó, se inicia el remate secuencial (sin depender de Postman).
+      // arrancarSubasta ya emite item_actual a la sala, así que si arranca acá no
+      // hace falta re-emitir abajo.
+      let recienArrancada = false;
+      if (!motores[id_subasta] && String(process.env.AUTO_START_SUBASTA || 'true').toLowerCase() !== 'false') {
+        const sub = await Subasta.findByPk(id_subasta);
+        if (sub && sub.estado !== 'finalizada') {
+          const r = await arrancarSubasta(id_subasta);
+          recienArrancada = r.ok;
+        }
+      }
+      if (recienArrancada) return; // el item_actual ya salió por arrancarSubasta
+
       // Estado actual: si está corriendo, manda el ítem en remate; si no, el estado.
       const m = motores[id_subasta];
       if (m && m.piezaActualId) {
