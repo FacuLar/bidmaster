@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, Alert, ScrollView, Image, ActivityIndicator,
+  View, Text, StyleSheet, TextInput, Alert, ScrollView, Image, ActivityIndicator, Modal, TouchableOpacity,
 } from 'react-native';
 import { Boton, Tarjeta } from '../components/ui';
 import { conectarSocket } from '../api/socket';
@@ -33,6 +33,7 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
   const [segundos, setSegundos] = useState(null);
   const [ganados, setGanados] = useState([]);
   const [catalogo, setCatalogo] = useState([]); // todos los ítems de la subasta
+  const [detalle, setDetalle] = useState(null);  // ítem mostrado en el modal de detalle
 
   // Catálogo completo de la subasta (para mostrar que tiene varios ítems).
   useEffect(() => {
@@ -44,6 +45,8 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
   const socketRef = useRef(null);
   const cierreTsRef = useRef(null);
   const itemRef = useRef(null);
+  const pujeItemRef = useRef(false);   // ¿pujé en el ítem actual y sigue vivo?
+  const finalizadaRef = useRef(false);
   useEffect(() => { itemRef.current = item; }, [item]);
 
   const base = item?.precio_base || 0;
@@ -68,6 +71,7 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
         setItem(d);
         setOferta(d.oferta_actual || 0);
         setSoyLider(d.lider_id != null && String(d.lider_id) === String(miId));
+        pujeItemRef.current = false; // ítem nuevo: todavía no pujaste en él
         setMonto('');
         if (d.segundos_restantes != null) {
           cierreTsRef.current = Date.now() + d.segundos_restantes * 1000;
@@ -90,16 +94,18 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
         }
       });
 
-      socket.on('puja_confirmada', () => { setPujando(false); setMonto(''); });
+      socket.on('puja_confirmada', () => { setPujando(false); setMonto(''); pujeItemRef.current = true; });
       socket.on('puja_rechazada', (e) => { setPujando(false); Alert.alert('Puja rechazada', e.motivo); });
 
       socket.on('item_cerrado', (d) => {
+        // El ítem en el que pujabas cerró: ya podés salir.
+        if (itemRef.current && String(d.id_pieza) === String(itemRef.current.id_pieza)) pujeItemRef.current = false;
         if (String(d.lider_id) === String(miId)) {
           setGanados((g) => (g.find((x) => x.id_pieza === d.id_pieza) ? g : [...g, { id_pieza: d.id_pieza, titulo: d.titulo }]));
         }
       });
 
-      socket.on('subasta_finalizada', () => { setEstado('finalizada'); setItem(null); setSegundos(null); });
+      socket.on('subasta_finalizada', () => { finalizadaRef.current = true; setEstado('finalizada'); setItem(null); setSegundos(null); });
     })();
 
     tick = setInterval(() => {
@@ -115,6 +121,18 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
       }
     };
   }, []);
+
+  // Bloqueo de salida: si pujaste por el ítem que se está rematando, no podés
+  // abandonar la sala hasta que ese ítem se resuelva (o termine la subasta).
+  useEffect(() => {
+    const sub = navigation.addListener('beforeRemove', (e) => {
+      if (pujeItemRef.current && !finalizadaRef.current) {
+        e.preventDefault();
+        Alert.alert('No podés salir', 'Estás pujando por el ítem actual. Esperá a que se remate.');
+      }
+    });
+    return sub;
+  }, [navigation]);
 
   function pujar() {
     const valor = Number(monto);
@@ -136,25 +154,45 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
     </Tarjeta>
   ) : null);
 
-  // Tira con TODOS los ítems de la subasta (deja claro que tiene varios).
+  // Tira con TODOS los ítems de la subasta (tocá uno para ver su detalle).
   const CatalogoStrip = () => (catalogo.length > 0 ? (
     <View style={styles.catWrap}>
-      <Text style={styles.catTit}>Catálogo · {catalogo.length} ítems (se rematan en orden)</Text>
+      <Text style={styles.catTit}>Catálogo · {catalogo.length} ítems · tocá uno para ver el detalle</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         {catalogo.map((p, i) => {
           const actual = item && String(p.id_pieza) === String(item.id_pieza);
           const vendido = p.estado !== 'en_subasta' || (item && (i + 1) < item.orden);
           return (
-            <View key={p.id_pieza} style={[styles.catItem, actual && styles.catItemActual, vendido && styles.catItemVendido]}>
-              <Text style={styles.catNum}>#{i + 1}</Text>
-              <Text style={styles.catNom} numberOfLines={1}>{p.titulo}</Text>
+            <TouchableOpacity key={p.id_pieza} activeOpacity={0.85} onPress={() => setDetalle({ ...p, orden: i + 1 })}
+              style={[styles.catItem, actual && styles.catItemActual, vendido && styles.catItemVendido]}>
+              {p.imagenes && p.imagenes[0] ? <Image source={{ uri: p.imagenes[0] }} style={styles.catImg} /> : null}
+              <Text style={styles.catNum}>#{i + 1} · {p.titulo}</Text>
               <Text style={styles.catEst}>{actual ? '🔴 ahora' : vendido ? '✓ rematado' : '⏳ en cola'}</Text>
-            </View>
+            </TouchableOpacity>
           );
         })}
       </ScrollView>
     </View>
   ) : null);
+
+  // Modal con el detalle del ítem tocado en el catálogo.
+  const ModalDetalle = () => (
+    <Modal visible={!!detalle} animationType="slide" transparent onRequestClose={() => setDetalle(null)}>
+      <View style={styles.modalBg}>
+        <View style={styles.modalCard}>
+          <ScrollView>
+            {detalle?.imagenes && detalle.imagenes[0] ? <Image source={{ uri: detalle.imagenes[0] }} style={styles.modalImg} /> : null}
+            <Text style={styles.modalTit}>#{detalle?.orden} · {detalle?.titulo}</Text>
+            {detalle?.artista ? <Text style={styles.modalMeta}>🎨 {detalle.artista}{detalle.fecha_obra ? ` · ${detalle.fecha_obra}` : ''}</Text> : null}
+            <Text style={styles.modalPrecio}>Precio base: {simbolo}{Number(detalle?.precio_base || 0).toLocaleString()}</Text>
+            {detalle?.descripcion ? <Text style={styles.modalTxt}>{detalle.descripcion}</Text> : null}
+            {detalle?.historia ? <Text style={styles.modalTxt}>{detalle.historia}</Text> : null}
+            <Boton title="Cerrar" variant="secondary" onPress={() => setDetalle(null)} />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
 
   // --- Estados no "en curso" ---
   if (estado === 'conectando') {
@@ -168,6 +206,7 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
           <Text style={styles.msgTit}>La subasta arranca en instantes…</Text>
           <Text style={styles.msg}>Tiene {catalogo.length} ítems y se rematan de a uno, en orden.</Text>
         </View>
+        <ModalDetalle />
         <CatalogoStrip />
         <Boton title="Salir" variant="secondary" onPress={() => navigation.goBack()} />
       </ScrollView>
@@ -187,6 +226,7 @@ export default function SubastaEnVivoScreen({ route, navigation }) {
   // --- En curso: ítem actual ---
   return (
     <ScrollView style={styles.container}>
+      <ModalDetalle />
       <CatalogoStrip />
       <View style={styles.live}>
         <Text style={styles.liveTxt}>🔴 EN VIVO · Subasta #{idSubasta}</Text>
@@ -249,12 +289,20 @@ const crearStyles = (colors) => StyleSheet.create({
   nota: { color: colors.grisTexto, fontSize: 12, textAlign: 'center', marginTop: 8 },
   catWrap: { backgroundColor: colors.superficie, paddingVertical: 10, paddingLeft: 12, borderBottomWidth: 1, borderBottomColor: colors.borde },
   catTit: { color: colors.grisTexto, fontSize: 11.5, fontWeight: '700', marginBottom: 8 },
-  catItem: { width: 120, backgroundColor: colors.grisPerla, borderRadius: 10, padding: 8, marginRight: 8, borderWidth: 1, borderColor: colors.borde },
+  catItem: { width: 130, backgroundColor: colors.grisPerla, borderRadius: 10, padding: 8, marginRight: 8, borderWidth: 1, borderColor: colors.borde },
   catItemActual: { borderColor: colors.naranja, borderWidth: 2, backgroundColor: colors.naranjaSuave },
   catItemVendido: { opacity: 0.5 },
-  catNum: { color: colors.azulMarino, fontWeight: '900', fontSize: 12 },
-  catNom: { color: colors.textoOscuro, fontSize: 11.5, fontWeight: '600', marginTop: 2 },
+  catImg: { width: '100%', height: 60, borderRadius: 6, marginBottom: 5, backgroundColor: colors.grisBorde },
+  catNum: { color: colors.azulMarino, fontWeight: '800', fontSize: 11.5 },
   catEst: { color: colors.grisTexto, fontSize: 10.5, marginTop: 3, fontWeight: '700' },
+
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: colors.superficie, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, maxHeight: '82%' },
+  modalImg: { width: '100%', height: 200, borderRadius: 12, marginBottom: 12, backgroundColor: colors.grisBorde },
+  modalTit: { fontSize: 19, fontWeight: '800', color: colors.azulMarino },
+  modalMeta: { color: colors.grisTexto, marginTop: 4, fontWeight: '600' },
+  modalPrecio: { color: colors.verdeOscuro, fontWeight: '800', fontSize: 15, marginTop: 6 },
+  modalTxt: { color: colors.textoOscuro, marginTop: 10, lineHeight: 21 },
   ganados: { margin: 14, marginBottom: 0, borderColor: colors.verde, borderWidth: 1 },
   ganadosTit: { color: colors.verde, fontWeight: '800', fontSize: 15 },
   ganadosTxt: { color: colors.textoOscuro, fontSize: 13, marginTop: 2, marginBottom: 4 },

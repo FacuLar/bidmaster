@@ -108,6 +108,33 @@ function initSockets(io, app) {
     });
   }
 
+  // ¿La sala quedó sin nadie conectado?
+  function salaVacia(idSubasta) {
+    const r = io.sockets.adapter.rooms.get(room(idSubasta));
+    return !r || r.size === 0;
+  }
+
+  // Pausa el remate si no queda nadie mirando (así la subasta NO se consume sola
+  // ni desaparece del catálogo cuando te vas; se reanuda al volver a entrar).
+  function pausarSiVacia(idSubasta) {
+    const m = motores[idSubasta];
+    if (!m || m.pausado || !salaVacia(idSubasta)) return;
+    if (m.timer) clearTimeout(m.timer);
+    m.restante = Math.max(1000, m.cierra_ts - Date.now());
+    m.pausado = true;
+  }
+
+  // Reanuda el ítem actual desde donde quedó.
+  async function reanudar(idSubasta) {
+    const m = motores[idSubasta];
+    if (!m || !m.pausado) return;
+    m.cierra_ts = Date.now() + m.restante;
+    m.timer = setTimeout(() => cerrarYAvanzar(idSubasta), m.restante);
+    m.pausado = false;
+    const pieza = await Pieza.findByPk(m.piezaActualId);
+    if (pieza) io.to(room(idSubasta)).emit('item_actual', await snapshotItem(idSubasta, pieza, m));
+  }
+
   // Arranca una subasta: la marca activa y empieza a rematar ítem por ítem.
   async function arrancarSubasta(idSubasta) {
     const subasta = await Subasta.findByPk(idSubasta);
@@ -174,19 +201,20 @@ function initSockets(io, app) {
       salasUsuarios[usuario.id] = id_subasta;
       socket.emit('sala_unida', { id_subasta });
 
-      // Auto-arranque: al entrar el primer usuario, si la subasta no está corriendo
-      // y no terminó, se inicia el remate secuencial (sin depender de Postman).
-      // arrancarSubasta ya emite item_actual a la sala, así que si arranca acá no
-      // hace falta re-emitir abajo.
-      let recienArrancada = false;
-      if (!motores[id_subasta] && String(process.env.AUTO_START_SUBASTA || 'true').toLowerCase() !== 'false') {
+      // Al entrar: si está pausada (nadie la miraba) se reanuda; si nunca arrancó
+      // se auto-inicia. Ambos casos ya emiten item_actual a la sala.
+      let yaEmitido = false;
+      if (motores[id_subasta] && motores[id_subasta].pausado) {
+        await reanudar(id_subasta);
+        yaEmitido = true;
+      } else if (!motores[id_subasta] && String(process.env.AUTO_START_SUBASTA || 'true').toLowerCase() !== 'false') {
         const sub = await Subasta.findByPk(id_subasta);
         if (sub && sub.estado !== 'finalizada') {
           const r = await arrancarSubasta(id_subasta);
-          recienArrancada = r.ok;
+          yaEmitido = r.ok;
         }
       }
-      if (recienArrancada) return; // el item_actual ya salió por arrancarSubasta
+      if (yaEmitido) return; // el item_actual ya salió
 
       // Estado actual: si está corriendo, manda el ítem en remate; si no, el estado.
       const m = motores[id_subasta];
@@ -202,6 +230,7 @@ function initSockets(io, app) {
     socket.on('leave_subasta', ({ id_subasta }) => {
       socket.leave(room(id_subasta));
       delete salasUsuarios[usuario.id];
+      pausarSiVacia(id_subasta);
     });
 
     socket.on('nueva_puja', async ({ id_subasta, id_pieza, monto, id_medio_pago }) => {
@@ -251,8 +280,11 @@ function initSockets(io, app) {
     });
 
     socket.on('disconnect', () => {
+      const sub = salasUsuarios[usuario.id];
       delete salasUsuarios[usuario.id];
       pujaEnCurso.delete(usuario.id);
+      // Si el que se fue era el último de la sala, se pausa la subasta.
+      if (sub != null) setImmediate(() => pausarSiVacia(sub));
     });
   });
 }
