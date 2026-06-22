@@ -69,7 +69,7 @@ const listarArticulos = asyncHandler(async (req, res) => {
 const proponerArticulo = asyncHandler(async (req, res) => {
   const {
     titulo, descripcion, historia, fotos, tipo_bien,
-    qr_titulo, compraventa, fotos_prueba,
+    qr_titulo, compraventa, fotos_prueba, medio_pago_id,
     acepta_devolucion, acepta_terminos, declaracion_jurada_licita, acredita_origen,
   } = req.body;
 
@@ -87,8 +87,17 @@ const proponerArticulo = asyncHandler(async (req, res) => {
   if (tipo_bien === 'auto' && !qr_titulo) {
     throw new AppError('Para un automóvil necesitás adjuntar el QR del título', 400);
   }
-  // Los vendedores solo operan con cuenta corriente (#20).
-  const cuenta = await MedioPago.findOne({ where: { usuario_id: req.usuario.id, tipo: 'CUENTA' } });
+  // Los vendedores solo operan con cuenta corriente (#20). El usuario elige cuál
+  // (medio_pago_id); si no la manda, se toma la primera cuenta que tenga.
+  let cuenta;
+  if (medio_pago_id) {
+    cuenta = await MedioPago.findOne({
+      where: { id: medio_pago_id, usuario_id: req.usuario.id, tipo: 'CUENTA' },
+    });
+    if (!cuenta) throw new AppError('La cuenta elegida no es válida', 400);
+  } else {
+    cuenta = await MedioPago.findOne({ where: { usuario_id: req.usuario.id, tipo: 'CUENTA' } });
+  }
   if (!cuenta) {
     throw new AppError('Para vender necesitás una cuenta corriente registrada en tu billetera', 400);
   }
@@ -109,6 +118,7 @@ const proponerArticulo = asyncHandler(async (req, res) => {
     acredita_origen: !!acredita_origen,
     estado: interesa ? 'A inspeccionar' : 'Rechazado',
     motivo_rechazo: interesa ? null : 'El bien no es de interés para las subastas actuales',
+    medio_pago_id: cuenta.id,
     usuario_id: req.usuario.id,
   });
 
@@ -203,12 +213,18 @@ const confirmarDevolucion = asyncHandler(async (req, res) => {
     articulo.costo_flete = COSTO_FLETE_DEVOLUCION;
     await articulo.save();
 
-    // El flete se cobra con cargo al vendedor: se descuenta de su cuenta corriente.
+    // El flete se cobra con cargo al vendedor: se descuenta de la cuenta que
+    // eligió al proponer el bien (o, si no hay, la primera cuenta que tenga).
     let saldo_restante = null;
-    const cuenta = await MedioPago.findOne({
-      where: { usuario_id: req.usuario.id, tipo: 'CUENTA' },
-      order: [['saldo_disponible', 'DESC']],
-    });
+    let cuenta = articulo.medio_pago_id
+      ? await MedioPago.findOne({ where: { id: articulo.medio_pago_id, usuario_id: req.usuario.id } })
+      : null;
+    if (!cuenta) {
+      cuenta = await MedioPago.findOne({
+        where: { usuario_id: req.usuario.id, tipo: 'CUENTA' },
+        order: [['saldo_disponible', 'DESC']],
+      });
+    }
     if (cuenta) {
       cuenta.saldo_disponible = Math.max(0, cuenta.saldo_disponible - COSTO_FLETE_DEVOLUCION);
       await cuenta.save();

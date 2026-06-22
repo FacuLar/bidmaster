@@ -37,6 +37,8 @@ const Articulo = sequelize.define('Articulo', {
   fecha_subasta: { type: DataTypes.DATEONLY },
   // Pieza generada al aceptar la tasación (queda incluida en una subasta).
   pieza_id: { type: DataTypes.INTEGER, allowNull: true },
+  // Cuenta corriente elegida para cobros/cargos (flete de devolución, etc.).
+  medio_pago_id: { type: DataTypes.INTEGER, allowNull: true },
   // Resultado de venta (lo único que ve el vendedor; sin historial de pujas #19).
   monto_venta: { type: DataTypes.FLOAT },
   // Logística y seguro una vez aceptado.

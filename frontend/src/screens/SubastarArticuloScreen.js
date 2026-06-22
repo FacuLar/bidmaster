@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, Image,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { Boton, Campo } from '../components/ui';
-import { VendedorAPI } from '../api/endpoints';
+import { Boton, Campo, SelectorMedios } from '../components/ui';
+import { VendedorAPI, PagoAPI } from '../api/endpoints';
 import colors from '../theme/colors';
 
 const TIPOS = [
@@ -24,8 +25,21 @@ export default function SubastarArticuloScreen({ navigation }) {
   const [compraventa, setCompraventa] = useState(null); // boleto de compraventa (opcional)
   const [checks, setChecks] = useState({ pertenece: false, origen: false, devolucion: false, terminos: false });
   const [enviando, setEnviando] = useState(false);
+  const [cuentas, setCuentas] = useState([]);   // cuentas corrientes del vendedor
+  const [cuentaSel, setCuentaSel] = useState(null);
 
   const toggle = (k) => setChecks((c) => ({ ...c, [k]: !c[k] }));
+
+  // Carga las cuentas corrientes para elegir cuál usar (cobros y cargo de flete).
+  const cargarCuentas = useCallback(async () => {
+    try {
+      const medios = await PagoAPI.listar();
+      const ctas = medios.filter((m) => m.tipo === 'CUENTA');
+      setCuentas(ctas);
+      setCuentaSel((s) => s ?? ctas[0]?.id ?? null);
+    } catch (e) { /* silencioso */ }
+  }, []);
+  useFocusEffect(useCallback(() => { cargarCuentas(); }, [cargarCuentas]));
 
   async function agregarFoto() {
     try {
@@ -58,6 +72,9 @@ export default function SubastarArticuloScreen({ navigation }) {
     }
     if (!checks.terminos) { Alert.alert('Términos y condiciones', 'Debés aceptar los términos y condiciones.'); return; }
     if (tipo === 'auto' && !qrTitulo) { Alert.alert('Auto', 'Para un automóvil adjuntá el QR del título.'); return; }
+    if (!cuentaSel) {
+      Alert.alert('Falta la cuenta', 'Elegí (o registrá en la Billetera) una cuenta corriente para cobros y cargos.'); return;
+    }
 
     setEnviando(true);
     try {
@@ -65,6 +82,7 @@ export default function SubastarArticuloScreen({ navigation }) {
         titulo, descripcion, historia, tipo_bien: tipo,
         fotos,
         qr_titulo: qrTitulo, compraventa,
+        medio_pago_id: cuentaSel,
         acepta_devolucion: checks.devolucion,
         acepta_terminos: checks.terminos,
         declaracion_jurada_licita: checks.pertenece,
@@ -129,7 +147,12 @@ export default function SubastarArticuloScreen({ navigation }) {
       <Check k="devolucion" label="Acepto los cargos de devolución si es rechazado" />
       <Check k="terminos" label="Acepto los términos y condiciones" />
 
-      <Text style={styles.nota}>Para vender necesitás una cuenta corriente registrada en tu billetera.</Text>
+      <Text style={styles.lbl}>Cuenta corriente para cobros y cargos</Text>
+      {cuentas.length === 0 ? (
+        <Text style={styles.nota}>Necesitás una cuenta corriente registrada en tu Billetera para poder vender.</Text>
+      ) : (
+        <SelectorMedios medios={cuentas} elegido={cuentaSel} onElegir={setCuentaSel} />
+      )}
       <Boton title="ENVIAR PARA EVALUACIÓN" onPress={enviar} loading={enviando} />
     </ScrollView>
   );
