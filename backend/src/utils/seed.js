@@ -133,6 +133,16 @@ async function seed() {
       fecha_obra: '1985', historia: 'Mantenida por un fotógrafo profesional.',
       imagenes: fotos('nikon,camera'), subasta_id: subastaArs.id, dueno_id: facundo.id,
     },
+    {
+      nro_pieza: 112, categoria: 'arte', tags: ['Vintage','Exclusivo'], uso: 'usado', titulo: 'Espejo Veneciano',
+      descripcion: 'Espejo de cristal de Murano con marco tallado a mano.', precio_base: 48000,
+      imagenes: fotos('venetian,mirror'), subasta_id: subastaArs.id, dueno_id: oro.id,
+    },
+    {
+      nro_pieza: 113, categoria: 'hobbies', tags: ['Vintage','Colección','Impecable'], uso: 'restaurado', titulo: 'Reloj Cucú Suizo',
+      descripcion: 'Reloj cucú de madera tallada, mecanismo restaurado y funcionando.', precio_base: 26000,
+      fecha_obra: '1950', imagenes: fotos('cuckoo,clock'), subasta_id: subastaArs.id, dueno_id: facundo.id,
+    },
   ]);
 
   /* ------------------------ Subasta en dólares (plata) ---------------- */
@@ -186,6 +196,16 @@ async function seed() {
       descripcion: 'Par de gemelos de oro 18k con su estuche de cuero original.', precio_base: 2200,
       imagenes: fotos('cufflinks,gold'), subasta_id: subastaUsd.id, dueno_id: facundo.id,
     },
+    {
+      nro_pieza: 409, categoria: 'joyas', tags: ['Lujo','Garantía Oficial','Impecable'], uso: 'poco_uso', titulo: 'Reloj TAG Heuer',
+      descripcion: 'Cronógrafo TAG Heuer de acero, movimiento automático.', precio_base: 3200,
+      artista: 'TAG Heuer', imagenes: fotos('tagheuer,watch'), subasta_id: subastaUsd.id, dueno_id: oro.id,
+    },
+    {
+      nro_pieza: 410, categoria: 'moda', tags: ['Lujo','Exclusivo'], uso: 'nuevo', titulo: 'Anteojos de Diseñador',
+      descripcion: 'Anteojos de sol de diseñador, edición limitada con estuche.', precio_base: 800,
+      imagenes: fotos('luxury,sunglasses'), subasta_id: subastaUsd.id, dueno_id: facundo.id,
+    },
   ]);
 
   /* ------------------- Subasta premium (oro) -------------------------- */
@@ -229,6 +249,13 @@ async function seed() {
       artista: 'Patek Philippe', fecha_obra: '2005',
       historia: 'Con caja, papeles y certificado de autenticidad.',
       imagenes: fotos('luxury,watch'), subasta_id: subastaOro.id, dueno_id: facundo.id,
+    },
+    {
+      nro_pieza: 206, categoria: 'arte', tags: ['Arte','Exclusivo','Raro'], uso: 'usado', titulo: 'Escultura de Mármol',
+      descripcion: 'Escultura de mármol de Carrara, figura clásica de gran porte.', precio_base: 1200000,
+      artista: 'Escuela italiana', fecha_obra: '1890',
+      historia: 'Pieza de jardín de una residencia histórica.',
+      imagenes: fotos('marble,sculpture'), subasta_id: subastaOro.id, dueno_id: facundo.id,
     },
   ]);
 
@@ -276,6 +303,26 @@ async function seed() {
       nro_pieza: 307, categoria: 'vehiculos', tags: ['Exclusivo','Impecable'], uso: 'poco_uso', titulo: 'Bicicleta de Alta Gama',
       descripcion: 'Bicicleta de ruta de fibra de carbono, grupo profesional.', precio_base: 150000,
       imagenes: fotos('road,bicycle'), subasta_id: subastaComun.id, dueno_id: facundo.id,
+    },
+    {
+      nro_pieza: 308, categoria: 'tecnologia', tags: ['Tecnología','Garantía Oficial','Impecable'], uso: 'poco_uso', titulo: 'Notebook Gamer',
+      descripcion: 'Notebook gamer, 16GB RAM y placa de video dedicada.', precio_base: 110000,
+      imagenes: fotos('gaming,laptop'), subasta_id: subastaComun.id, dueno_id: facundo.id,
+    },
+    {
+      nro_pieza: 309, categoria: 'tecnologia', tags: ['Tecnología','Lujo'], uso: 'nuevo', titulo: 'Auriculares Premium',
+      descripcion: 'Auriculares inalámbricos con cancelación de ruido.', precio_base: 35000,
+      imagenes: fotos('headphones'), subasta_id: subastaComun.id, dueno_id: oro.id,
+    },
+    {
+      nro_pieza: 310, categoria: 'tecnologia', tags: ['Fotografía','Tecnología'], uso: 'usado', titulo: 'Cámara GoPro',
+      descripcion: 'Cámara de acción GoPro con kit de accesorios.', precio_base: 28000,
+      imagenes: fotos('gopro,action,camera'), subasta_id: subastaComun.id, dueno_id: facundo.id,
+    },
+    {
+      nro_pieza: 311, categoria: 'hobbies', tags: ['Deportes','Impecable'], uso: 'poco_uso', titulo: 'Skate Profesional',
+      descripcion: 'Skate profesional de arce canadiense, ruedas de competición.', precio_base: 18000,
+      imagenes: fotos('skateboard'), subasta_id: subastaComun.id, dueno_id: oro.id,
     },
   ]);
 

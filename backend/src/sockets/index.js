@@ -201,13 +201,15 @@ function initSockets(io, app) {
       salasUsuarios[usuario.id] = id_subasta;
       socket.emit('sala_unida', { id_subasta });
 
-      // Al entrar: si está pausada (nadie la miraba) se reanuda; si nunca arrancó
-      // se auto-inicia. Ambos casos ya emiten item_actual a la sala.
+      // Al entrar: si la subasta está pausada (nadie la miraba) se reanuda donde
+      // quedó. NO se auto-inicia: la subasta arranca manualmente por un admin
+      // (POST /admin/subastas/:id/comenzar). Con AUTO_START_SUBASTA=true se puede
+      // habilitar el arranque automático al entrar (apagado por defecto).
       let yaEmitido = false;
       if (motores[id_subasta] && motores[id_subasta].pausado) {
         await reanudar(id_subasta);
         yaEmitido = true;
-      } else if (!motores[id_subasta] && String(process.env.AUTO_START_SUBASTA || 'true').toLowerCase() !== 'false') {
+      } else if (!motores[id_subasta] && String(process.env.AUTO_START_SUBASTA || 'false').toLowerCase() === 'true') {
         const sub = await Subasta.findByPk(id_subasta);
         if (sub && sub.estado !== 'finalizada') {
           const r = await arrancarSubasta(id_subasta);

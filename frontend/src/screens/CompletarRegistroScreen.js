@@ -79,7 +79,9 @@ export default function CompletarRegistroScreen({ route, navigation }) {
   if (!id_solicitud) {
     return (
       <View style={styles.container}>
-        <Text style={styles.rechazo}>No encontramos tu solicitud. Volvé a registrarte.</Text>
+        <Text style={styles.rechazo}>Para participar necesitás crear tu cuenta.</Text>
+        <Text style={styles.subtexto}>Como invitado podés mirar las subastas, pero para pujar y tener billetera hay que registrarse.</Text>
+        <Boton title="CREAR CUENTA" onPress={() => navigation.navigate('Registro')} />
         <Boton title="Volver" variant="secondary" onPress={salir} />
       </View>
     );

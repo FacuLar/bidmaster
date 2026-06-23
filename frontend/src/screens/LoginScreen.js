@@ -11,7 +11,7 @@ import { useTheme } from '../theme/ThemeContext';
 export default function LoginScreen({ navigation }) {
   const { colors } = useTheme();
   const styles = React.useMemo(() => crearStyles(colors), [colors]);
-  const { login } = useAuth();
+  const { login, entrarComoInvitado } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -73,6 +73,10 @@ export default function LoginScreen({ navigation }) {
         </View>
 
         <Boton title="CREAR CUENTA" variant="outline" onPress={() => navigation.navigate('Registro')} />
+
+        <TouchableOpacity onPress={() => entrarComoInvitado({ invitadoPuro: true })}>
+          <Text style={styles.invitado}>👁  Entrar como invitado (solo mirar)</Text>
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.pie}>BidMaster · TPO Desarrollo de Aplicaciones 1</Text>
@@ -100,6 +104,7 @@ const crearStyles = (colors) => StyleSheet.create({
   subtitulo: { fontSize: 13, color: colors.grisTexto, textAlign: 'center', marginTop: 4, marginBottom: 18 },
   olvido: { color: colors.naranja, textAlign: 'center', marginTop: 14, fontWeight: '600' },
   validar: { color: colors.azulMarino, textAlign: 'center', marginTop: 12, fontWeight: '700', fontSize: 13 },
+  invitado: { color: colors.grisTexto, textAlign: 'center', marginTop: 14, fontWeight: '600', fontSize: 13 },
   sep: { flexDirection: 'row', alignItems: 'center', marginTop: 18, marginBottom: 6 },
   sepLinea: { flex: 1, height: 1, backgroundColor: colors.grisBorde },
   sepTxt: { color: colors.grisTexto, fontSize: 12, marginHorizontal: 10, fontWeight: '600' },

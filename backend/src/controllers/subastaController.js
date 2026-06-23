@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Subasta, Pieza, MedioPago, Usuario } = require('../models');
+const { Subasta, Pieza, MedioPago, Usuario, Multa } = require('../models');
 const { AppError, asyncHandler } = require('../middleware/errorHandler');
 const { puedeAcceder } = require('../services/categoriaService');
 const { subastaComprometida } = require('../services/pujaService');
@@ -84,9 +84,10 @@ const streaming = asyncHandler(async (req, res) => {
     throw new AppError('La subasta ya finalizó', 400);
   }
 
-  // Cuenta suspendida (multa impaga): no accede a los servicios.
-  if (req.usuario.estado === 'suspendido') {
-    throw new AppError('Cuenta suspendida por multa impaga: regularizá para acceder', 403);
+  // Multa impaga / cuenta suspendida: no se puede entrar a las salas hasta pagar.
+  const multaPendiente = await Multa.findOne({ where: { usuario_id: req.usuario.id, estado: 'con_deuda' } });
+  if (multaPendiente || req.usuario.estado === 'suspendido') {
+    throw new AppError('Tenés una multa pendiente: pagala para volver a entrar a las subastas', 403);
   }
 
   if (!puedeAcceder(req.usuario.categoria, subasta.categoria_requerida)) {

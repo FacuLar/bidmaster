@@ -97,7 +97,8 @@ export default function AppNavigator() {
         ) : (
           <>
             <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
-            {/* Accesible para el invitado: generar la clave y validar la cuenta. */}
+            {/* Accesible para el invitado: crear cuenta o generar la clave y validar. */}
+            <Stack.Screen name="Registro" component={RegistroScreen} options={{ title: 'Creá tu cuenta' }} />
             <Stack.Screen name="CompletarRegistro" component={CompletarRegistroScreen} options={{ title: 'Validar mi cuenta' }} />
             <Stack.Screen name="HistoriaObjeto" component={HistoriaObjetoScreen} options={{ title: 'Historia del Objeto' }} />
             <Stack.Screen name="SubastaEnVivo" component={SubastaEnVivoScreen} options={{ title: 'EN VIVO' }} />
