@@ -19,6 +19,7 @@ Todas las llamadas de administración requieren el header:
 x-admin-key: bidmaster_admin_2026
 ```
 
+
 Base URL local: `http://localhost:4000/api/v1`
 
 ---

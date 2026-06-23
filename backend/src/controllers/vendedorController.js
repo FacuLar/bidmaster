@@ -1,23 +1,25 @@
 const {
   PropuestaVenta, MedioPago, Subasta, Catalogo, ItemCatalogo, Producto, Foto,
-  ClasificacionProducto, Duenio, Empleado,
+  ClasificacionProducto, Duenio, Empleado, Persona,
 } = require('../models');
 const { AppError, asyncHandler } = require('../middleware/errorHandler');
 
 const COSTO_FLETE_DEVOLUCION = 1500;
 const COMISION_DEFAULT = 10;
 
-function leInteresa(titulo) {
-  const t = (titulo || '').toLowerCase();
-  if (t.trim().length < 3) return false;
-  return !/(rot[oa]|basura|replica|trucho|fals[oa]|chatarra|quemad[oa])/.test(t);
-}
-function enCondiciones(titulo) {
-  const t = (titulo || '').toLowerCase();
-  return !/(dudos[oa]|dañad[oa]|deteriorad[oa]|incomplet[oa]|roto|rota)/.test(t);
-}
+/**
+ * Flujo de inclusión de bienes. La empresa NO decide nada de forma automática:
+ * todas sus decisiones (interés, inspección/tasación) se resuelven por Postman
+ * (endpoints /admin/...). Estados:
+ *   Propuesta       -> el usuario lo propuso; la empresa evalúa interés (admin)
+ *   A inspeccionar  -> a la empresa le interesa; el usuario debe enviarlo
+ *   En inspección   -> el usuario lo envió; la empresa inspecciona/tasa (admin)
+ *   Tasado          -> tasado; el usuario acepta o rechaza la tasación
+ *   Programado      -> aceptado; entró a una subasta
+ *   Rechazado       -> la empresa no lo quiere / no pasó inspección
+ *   Devuelto / Cancelado
+ */
 
-// Asegura un Duenio para el cliente (Producto.duenio lo requiere).
 async function asegurarDuenio(clienteId) {
   let d = await Duenio.findByPk(clienteId);
   if (!d) d = await Duenio.create({ identificador: clienteId, numeroPais: 32, verificacionFinanciera: 'si', verificacionJudicial: 'si', calificacionRiesgo: 3 });
@@ -25,7 +27,6 @@ async function asegurarDuenio(clienteId) {
 }
 async function unEmpleado() { return (await Empleado.findOne()) || Empleado.create({ cargo: 'Revisor' }); }
 
-// Subasta "de la Comunidad" (abierta) + su catálogo, donde caen los bienes aceptados.
 async function obtenerComunidad() {
   let subasta = await Subasta.findOne({ where: { ubicacion: 'Salón Comunidad', estado: 'abierta' } });
   if (!subasta) {
@@ -37,7 +38,7 @@ async function obtenerComunidad() {
   return { subasta, cat };
 }
 
-function mapPropuesta(p) {
+function mapPropuesta(p, extra = {}) {
   return {
     id_tramite: p.identificador,
     titulo: p.titulo,
@@ -53,16 +54,17 @@ function mapPropuesta(p) {
     ubicacion_deposito: p.ubicacion_deposito,
     motivo_rechazo: p.motivo_rechazo,
     fecha_ingreso: p.createdAt,
+    ...extra,
   };
 }
 
 /* 5.0 GET /vendedores/articulos */
 const listarArticulos = asyncHandler(async (req, res) => {
   const props = await PropuestaVenta.findAll({ where: { vendedor: req.usuario.id }, order: [['createdAt', 'DESC']] });
-  res.status(200).json(props.map(mapPropuesta));
+  res.status(200).json(props.map((p) => mapPropuesta(p)));
 });
 
-/* 5.1 POST /vendedores/articulos */
+/* 5.1 POST /vendedores/articulos — el usuario propone; la empresa evaluará después */
 const proponerArticulo = asyncHandler(async (req, res) => {
   const {
     titulo, descripcion, historia, fotos, tipo_bien, qr_titulo, medio_pago_id,
@@ -83,53 +85,35 @@ const proponerArticulo = asyncHandler(async (req, res) => {
   }
   if (!cuenta) throw new AppError('Para vender necesitás una cuenta corriente registrada en tu billetera', 400);
 
-  const interesa = leInteresa(titulo);
   const p = await PropuestaVenta.create({
     vendedor: req.usuario.id, titulo, descripcion, historia, tipo_bien: tipo_bien || 'otro',
-    fotos, qr_titulo: qr_titulo || null, medio_pago: cuenta.identificador,
-    estado: interesa ? 'A inspeccionar' : 'Rechazado',
-    motivo_rechazo: interesa ? null : 'El bien no es de interés para las subastas actuales',
+    fotos, qr_titulo: qr_titulo || null, medio_pago: cuenta.identificador, estado: 'Propuesta',
   });
   res.status(201).json({
-    id_tramite: p.identificador, estado: p.estado, interesa,
-    mensaje: interesa ? 'Nos interesa tu bien. Traelo al depósito para inspeccionarlo.' : 'El bien no es de interés en este momento.',
+    id_tramite: p.identificador, estado: p.estado,
+    mensaje: 'Tu propuesta fue recibida. La empresa va a evaluar si le interesa el bien.',
   });
 });
 
 const buscarPropuesta = async (id, clienteId) => PropuestaVenta.findOne({ where: { identificador: id, vendedor: clienteId } });
 
-/* 5.2 PATCH /vendedores/articulos/:id/inspeccion */
+/* 5.2 PATCH /vendedores/articulos/:id/inspeccion — el usuario ENVÍA o CANCELA */
 const confirmarInspeccion = asyncHandler(async (req, res) => {
   const { decision } = req.body;
   const p = await buscarPropuesta(req.params.id, req.usuario.id);
   if (!p) throw new AppError('Artículo no encontrado', 404);
-  if (p.estado !== 'A inspeccionar') throw new AppError('El artículo no está esperando inspección', 400);
+  if (p.estado !== 'A inspeccionar') throw new AppError('El artículo no está esperando que lo envíes a inspección', 400);
 
   if (decision === 'CANCELAR') { p.estado = 'Cancelado'; await p.save(); return res.status(200).json({ estado: p.estado, mensaje: 'Cancelaste el envío del bien.' }); }
   if (decision !== 'ENVIAR') throw new AppError('Decisión inválida (ENVIAR / CANCELAR)', 400);
 
-  if (enCondiciones(p.titulo)) {
-    p.estado = 'Tasado';
-    p.valor_base_sugerido = p.valor_base_sugerido || 12000;
-    p.comisiones = COMISION_DEFAULT;
-    p.fecha_subasta = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-    p.ubicacion_deposito = 'Centro Logístico Sur - Pasillo 4B';
-    p.seguro_compania = 'Seguros Patria S.A.';
-    p.seguro_cobertura = p.valor_base_sugerido;
-    await p.save();
-    return res.status(200).json({
-      estado: p.estado,
-      tasacion: { valor_base: Number(p.valor_base_sugerido), comision_porcentaje: p.comisiones, fecha_subasta: p.fecha_subasta },
-      mensaje: 'El bien pasó la inspección. Revisá la tasación propuesta.',
-    });
-  }
-  p.estado = 'Rechazado';
-  p.motivo_rechazo = 'El bien no está en condiciones tras la inspección';
+  p.estado = 'En inspección';
+  p.ubicacion_deposito = 'Centro Logístico Sur - Pasillo 4B';
   await p.save();
-  res.status(200).json({ estado: p.estado, mensaje: 'El bien no está en condiciones. Retiralo o pedí la devolución con cargo de flete.' });
+  res.status(200).json({ estado: p.estado, mensaje: 'Recibimos tu bien en el depósito. Queda a la espera de la inspección y tasación.' });
 });
 
-/* 5.3 PATCH /vendedores/articulos/:id/condiciones */
+/* 5.3 PATCH /vendedores/articulos/:id/condiciones — el usuario ACEPTA o RECHAZA la tasación */
 const responderCondiciones = asyncHandler(async (req, res) => {
   const { decision } = req.body;
   const p = await buscarPropuesta(req.params.id, req.usuario.id);
@@ -149,7 +133,7 @@ const responderCondiciones = asyncHandler(async (req, res) => {
     const imgs = Array.isArray(p.fotos) ? p.fotos : [];
     if (imgs.length) await Foto.bulkCreate(imgs.map((f) => ({ producto: prod.identificador, foto: f })));
     await ClasificacionProducto.create({ producto: prod.identificador, categoria: p.tipo_bien || 'otros', tags: [], uso: 'usado' });
-    const item = await ItemCatalogo.create({ catalogo: cat.identificador, producto: prod.identificador, precioBase: base, comision: Math.round(base * 0.1), subastado: 'no' });
+    const item = await ItemCatalogo.create({ catalogo: cat.identificador, producto: prod.identificador, precioBase: base, comision: Math.round(base * (p.comisiones || 10) / 100), subastado: 'no' });
 
     p.estado = 'Programado';
     p.producto = prod.identificador;
@@ -215,4 +199,68 @@ const logistica = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { listarArticulos, proponerArticulo, confirmarInspeccion, responderCondiciones, confirmarDevolucion, facturaFlete, logistica };
+/* ============================ ADMIN (Postman) ============================ */
+
+/* GET /admin/vendedores/articulos?estado= — la empresa ve los trámites */
+const adminListarArticulos = asyncHandler(async (req, res) => {
+  const where = {};
+  if (req.query.estado) where.estado = req.query.estado;
+  const props = await PropuestaVenta.findAll({ where, order: [['createdAt', 'DESC']] });
+  const data = [];
+  for (const p of props) {
+    const persona = await Persona.findByPk(p.vendedor);
+    data.push(mapPropuesta(p, { vendedor_id: p.vendedor, vendedor: persona ? persona.nombre : null }));
+  }
+  res.status(200).json(data);
+});
+
+/* PATCH /admin/vendedores/articulos/:id/interes  { interesa } — ¿le interesa a la empresa? */
+const adminEvaluarInteres = asyncHandler(async (req, res) => {
+  const { interesa } = req.body;
+  const p = await PropuestaVenta.findByPk(req.params.id);
+  if (!p) throw new AppError('Trámite no encontrado', 404);
+  if (p.estado !== 'Propuesta') throw new AppError(`El trámite no está en estado "Propuesta" (está en "${p.estado}")`, 400);
+  if (interesa === false) {
+    p.estado = 'Rechazado';
+    p.motivo_rechazo = 'El bien no es de interés para las subastas actuales';
+    await p.save();
+    return res.status(200).json({ id_tramite: p.identificador, estado: p.estado, mensaje: 'Trámite rechazado por falta de interés.' });
+  }
+  p.estado = 'A inspeccionar';
+  await p.save();
+  res.status(200).json({ id_tramite: p.identificador, estado: p.estado, mensaje: 'La empresa marcó interés. El vendedor debe enviar el bien al depósito.' });
+});
+
+/* PATCH /admin/vendedores/articulos/:id/inspeccion  { aprobar, valor_base, comision } */
+const adminInspeccionar = asyncHandler(async (req, res) => {
+  const { aprobar, valor_base, comision } = req.body;
+  const p = await PropuestaVenta.findByPk(req.params.id);
+  if (!p) throw new AppError('Trámite no encontrado', 404);
+  if (p.estado !== 'En inspección') throw new AppError(`El trámite no está en inspección (está en "${p.estado}")`, 400);
+
+  if (aprobar === false) {
+    p.estado = 'Rechazado';
+    p.motivo_rechazo = 'El bien no está en condiciones tras la inspección';
+    await p.save();
+    return res.status(200).json({ id_tramite: p.identificador, estado: p.estado, mensaje: 'Rechazado en inspección. El vendedor decide cómo recuperarlo.' });
+  }
+  p.estado = 'Tasado';
+  p.valor_base_sugerido = valor_base != null ? Number(valor_base) : 12000;
+  p.comisiones = comision != null ? Number(comision) : COMISION_DEFAULT;
+  p.fecha_subasta = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  p.ubicacion_deposito = p.ubicacion_deposito || 'Centro Logístico Sur - Pasillo 4B';
+  p.seguro_compania = 'Seguros Patria S.A.';
+  p.seguro_cobertura = p.valor_base_sugerido;
+  await p.save();
+  res.status(200).json({
+    id_tramite: p.identificador, estado: p.estado,
+    tasacion: { valor_base: Number(p.valor_base_sugerido), comision_porcentaje: p.comisiones, fecha_subasta: p.fecha_subasta },
+    mensaje: 'Tasación cargada. El vendedor debe aceptarla o rechazarla.',
+  });
+});
+
+module.exports = {
+  listarArticulos, proponerArticulo, confirmarInspeccion, responderCondiciones,
+  confirmarDevolucion, facturaFlete, logistica,
+  adminListarArticulos, adminEvaluarInteres, adminInspeccionar,
+};

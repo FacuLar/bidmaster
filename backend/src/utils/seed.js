@@ -150,16 +150,18 @@ async function seed() {
   const seisFotos = fotos('antique,object');
   const propuestaBase = { vendedor: facundo, fotos: seisFotos, medio_pago: null, tipo_bien: 'otro' };
   await PropuestaVenta.bulkCreate([
-    // 1) Recién propuesto: la empresa quiere inspeccionarlo (decidís ENVIAR / CANCELAR)
-    { ...propuestaBase, titulo: 'Reloj de bolsillo de plata', descripcion: 'Reloj antiguo funcionando', estado: 'A inspeccionar' },
-    // 2) TASADO: la empresa lo aprobó y propuso valor (decidís ACEPTAR / RECHAZAR)  <-- lo que pediste
-    { ...propuestaBase, titulo: 'Cámara fotográfica vintage', descripcion: 'Cámara a rollo en caja', estado: 'Tasado', valor_base_sugerido: 35000, comisiones: 10, fecha_subasta: new Date(Date.now() + 14 * 24 * 3600 * 1000), ubicacion_deposito: 'Centro Logístico Sur - Pasillo 4B', seguro_compania: 'Seguros Patria S.A.', seguro_cobertura: 35000 },
-    // 3) RECHAZADO en inspección (decidís cómo recuperarlo: RETIRO / ENVÍO con flete)
+    // 1) PROPUESTA: recién enviada; la empresa decide el INTERÉS por Postman
+    { ...propuestaBase, titulo: 'Reloj de bolsillo de plata', descripcion: 'Reloj antiguo funcionando', estado: 'Propuesta' },
+    // 2) A INSPECCIONAR: la empresa marcó interés; el usuario decide ENVIAR / CANCELAR
+    { ...propuestaBase, titulo: 'Vajilla de porcelana', descripcion: 'Set completo', estado: 'A inspeccionar' },
+    // 3) EN INSPECCIÓN: el usuario lo envió; la empresa lo TASA por Postman
+    { ...propuestaBase, titulo: 'Cámara fotográfica vintage', descripcion: 'Cámara a rollo en caja', estado: 'En inspección', ubicacion_deposito: 'Centro Logístico Sur - Pasillo 4B' },
+    // 4) TASADO: la empresa lo tasó; el usuario decide ACEPTAR / RECHAZAR
+    { ...propuestaBase, titulo: 'Escritorio antiguo', descripcion: 'Madera maciza', estado: 'Tasado', valor_base_sugerido: 35000, comisiones: 10, fecha_subasta: new Date(Date.now() + 14 * 24 * 3600 * 1000), ubicacion_deposito: 'Centro Logístico Sur - Pasillo 4B', seguro_compania: 'Seguros Patria S.A.', seguro_cobertura: 35000 },
+    // 5) RECHAZADO: el usuario decide cómo recuperarlo (RETIRO / ENVÍO con flete)
     { ...propuestaBase, titulo: 'Jarrón dañado', descripcion: 'Tiene una fisura', estado: 'Rechazado', motivo_rechazo: 'El bien no está en condiciones tras la inspección', ubicacion_deposito: 'Centro Logístico Sur - Pasillo 4B' },
-    // 4) PROGRAMADO: ya lo aceptaste y entró a una subasta
+    // 6) PROGRAMADO: ya aceptado y en una subasta
     { ...propuestaBase, titulo: 'Mesa ratona de roble', descripcion: 'Restaurada', estado: 'Programado', valor_base_sugerido: 28000, comisiones: 10, fecha_subasta: new Date(Date.now() + 10 * 24 * 3600 * 1000) },
-    // 5) DEVUELTO: rechazaste la tasación
-    { ...propuestaBase, titulo: 'Bicicleta de paseo', descripcion: 'Usada', estado: 'Devuelto', motivo_rechazo: 'El vendedor no aceptó el valor base / comisiones' },
   ]);
 
   // eslint-disable-next-line no-console

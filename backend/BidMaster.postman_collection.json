@@ -39,6 +39,10 @@
       "value": "1"
     },
     {
+      "key": "id_tramite",
+      "value": "1"
+    },
+    {
       "key": "img",
       "value": "data:image/png;base64,iVBORw0KGgoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
     }
@@ -790,11 +794,12 @@
                   "type": "string"
                 }
               ]
-            }
+            },
+            "description": "Guardá el id_tramite que quieras usar en la variable {{id_tramite}}."
           }
         },
         {
-          "name": "Proponer un bien",
+          "name": "Proponer un bien (-> Propuesta)",
           "request": {
             "method": "POST",
             "header": [
@@ -827,11 +832,22 @@
                 }
               ]
             },
-            "description": "Requiere 6 fotos, declaraciones y una cuenta corriente (CUENTA) en la billetera. Guardá el id_tramite que devuelve."
-          }
+            "description": "Requiere 6 fotos, declaraciones y una cuenta corriente (CUENTA). Queda en estado \"Propuesta\": la empresa decide el interés por Postman (carpeta 7)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let j = pm.response.json(); if (j.id_tramite) pm.collectionVariables.set(\"id_tramite\", j.id_tramite);"
+                ]
+              }
+            }
+          ]
         },
         {
-          "name": "Confirmar inspección (ENVIAR)",
+          "name": "Enviar a inspección (ENVIAR)",
           "request": {
             "method": "PATCH",
             "header": [
@@ -841,14 +857,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/vendedores/articulos/1/inspeccion",
+              "raw": "{{baseUrl}}/vendedores/articulos/{{id_tramite}}/inspeccion",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "vendedores",
                 "articulos",
-                "1",
+                "{{id_tramite}}",
                 "inspeccion"
               ]
             },
@@ -866,11 +882,11 @@
                 }
               ]
             },
-            "description": "Reemplazá el \"1\" por el id_tramite. ENVIAR -> tasación; CANCELAR -> cancela."
+            "description": "Sólo si la empresa marcó interés (estado \"A inspeccionar\"). ENVIAR -> queda \"En inspección\"; CANCELAR -> cancela."
           }
         },
         {
-          "name": "Responder condiciones (ACEPTAR)",
+          "name": "Responder tasación (ACEPTAR)",
           "request": {
             "method": "PATCH",
             "header": [
@@ -880,14 +896,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/vendedores/articulos/1/condiciones",
+              "raw": "{{baseUrl}}/vendedores/articulos/{{id_tramite}}/condiciones",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "vendedores",
                 "articulos",
-                "1",
+                "{{id_tramite}}",
                 "condiciones"
               ]
             },
@@ -905,7 +921,7 @@
                 }
               ]
             },
-            "description": "ACEPTAR materializa el bien como Producto + ItemCatalogo en la Subasta de la Comunidad."
+            "description": "Sólo si la empresa tasó (estado \"Tasado\"). ACEPTAR materializa el bien como Producto + ItemCatalogo en la Subasta de la Comunidad. RECHAZAR -> devolución."
           }
         },
         {
@@ -919,14 +935,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/vendedores/articulos/1/devolucion",
+              "raw": "{{baseUrl}}/vendedores/articulos/{{id_tramite}}/devolucion",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "vendedores",
                 "articulos",
-                "1",
+                "{{id_tramite}}",
                 "devolucion"
               ]
             },
@@ -953,14 +969,14 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/vendedores/articulos/1/factura-flete",
+              "raw": "{{baseUrl}}/vendedores/articulos/{{id_tramite}}/factura-flete",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "vendedores",
                 "articulos",
-                "1",
+                "{{id_tramite}}",
                 "factura-flete"
               ]
             },
@@ -982,14 +998,14 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/vendedores/articulos/1/logistica",
+              "raw": "{{baseUrl}}/vendedores/articulos/{{id_tramite}}/logistica",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "vendedores",
                 "articulos",
-                "1",
+                "{{id_tramite}}",
                 "logistica"
               ]
             },
@@ -1156,6 +1172,104 @@
               ]
             },
             "description": "Inicia el remate secuencial ítem por ítem. Sólo desde acá (no auto-arranca)."
+          }
+        },
+        {
+          "name": "Vendedor: listar trámites",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-admin-key",
+                "value": "{{adminKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/vendedores/articulos?estado=Propuesta",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "vendedores",
+                "articulos"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "Propuesta"
+                }
+              ]
+            },
+            "description": "La empresa ve los bienes propuestos. Filtrá por estado: Propuesta / En inspección / etc. Anotá el id_tramite."
+          }
+        },
+        {
+          "name": "Vendedor: evaluar interés",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-admin-key",
+                "value": "{{adminKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/vendedores/articulos/{{id_tramite}}/interes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "vendedores",
+                "articulos",
+                "{{id_tramite}}",
+                "interes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"interesa\": true\n}"
+            },
+            "description": "¿Le interesa el bien a la empresa? interesa:true -> \"A inspeccionar\"; interesa:false -> \"Rechazado\". (estado de partida: \"Propuesta\")"
+          }
+        },
+        {
+          "name": "Vendedor: inspeccionar y tasar",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-admin-key",
+                "value": "{{adminKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/vendedores/articulos/{{id_tramite}}/inspeccion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "vendedores",
+                "articulos",
+                "{{id_tramite}}",
+                "inspeccion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"aprobar\": true,\n  \"valor_base\": 30000,\n  \"comision\": 10\n}"
+            },
+            "description": "Resultado de la inspección física. aprobar:true -> \"Tasado\" con valor_base y comisión; aprobar:false -> \"Rechazado\". (estado de partida: \"En inspección\")"
           }
         },
         {

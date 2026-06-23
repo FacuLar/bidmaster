@@ -56,5 +56,9 @@ router.get('/admin/pagos/medios', requireAdmin, pago.adminListarMedios);
 router.patch('/admin/pagos/medios/:id/verificar', requireAdmin, pago.adminVerificarMedio);
 // Inicio de la subasta (remate secuencial ítem por ítem).
 router.post('/admin/subastas/:id/comenzar', requireAdmin, subasta.adminComenzarSubasta);
+// Decisiones de la empresa sobre los bienes propuestos (inclusión de bienes).
+router.get('/admin/vendedores/articulos', requireAdmin, vendedor.adminListarArticulos);
+router.patch('/admin/vendedores/articulos/:id/interes', requireAdmin, vendedor.adminEvaluarInteres);
+router.patch('/admin/vendedores/articulos/:id/inspeccion', requireAdmin, vendedor.adminInspeccionar);
 
 module.exports = router;
