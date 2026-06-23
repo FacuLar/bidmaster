@@ -102,6 +102,45 @@ ven el ítem actual y el reloj en tiempo real.
 
 ---
 
+## 4) Inclusión de bienes (vendedor) — decisiones de la empresa
+
+Cuando un usuario propone un bien para vender, **la empresa no decide nada solo**:
+el interés y la inspección/tasación los resolvés vos por Postman.
+
+Flujo completo:
+1. Usuario propone → queda en **Propuesta**.
+2. **Vos** evaluás interés.
+3. Si interesa, el usuario **envía** el bien → **En inspección**.
+4. **Vos** inspeccionás y tasás.
+5. El usuario **acepta/rechaza** la tasación. Si acepta, el bien entra a la subasta.
+
+### Listar trámites
+```
+GET /admin/vendedores/articulos?estado=Propuesta
+Header: x-admin-key: bidmaster_admin_2026
+```
+`estado` opcional: `Propuesta | A inspeccionar | En inspección | Tasado | Programado | Rechazado | Devuelto`.
+
+### Evaluar interés (estado de partida: Propuesta)
+```
+PATCH /admin/vendedores/articulos/:id/interes
+Body: { "interesa": true }     // false -> Rechazado
+```
+
+### Inspeccionar y tasar (estado de partida: En inspección)
+```
+PATCH /admin/vendedores/articulos/:id/inspeccion
+Body: { "aprobar": true, "valor_base": 30000, "comision": 10 }   // false -> Rechazado
+```
+
+---
+
+> 📦 **Colección de Postman**: importá `backend/BidMaster.postman_collection.json`
+> (Postman → Import → File). Trae **todos** los endpoints del proyecto, con el token
+> y los headers de admin ya configurados.
+
+---
+
 ## Validaciones automáticas (antes de llegar a vos)
 
 ### Registro de usuario

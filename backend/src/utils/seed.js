@@ -169,7 +169,7 @@ async function seed() {
   console.log(`   ${plata.length + comun.length} productos · 2 subastas`);
   console.log('   Clientes (pass 123456): facundo@ (plata) / oro@ (oro) / nuevo@ (comun)');
   console.log('   + multado@ (multa pendiente) · pendiente@ (registro a aprobar por admin)');
-  console.log('   facundo: 2 piezas ganadas (1 a pagar, 1 pagada) · 5 trámites de venta · 1 medio Pendiente');
+  console.log('   facundo: 2 piezas ganadas (1 a pagar, 1 pagada) · 6 trámites de venta · 1 medio Pendiente');
   await sequelize.close();
 }
 
