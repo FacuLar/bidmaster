@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { Boton, Campo } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
+
+// Clave donde la app guarda las credenciales recordadas (función "Recordarme").
+const CRED_KEY = 'credencialesRecordadas';
 
 export default function LoginScreen({ navigation }) {
   const { colors } = useTheme();
@@ -14,7 +18,23 @@ export default function LoginScreen({ navigation }) {
   const { login, entrarComoInvitado } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [recordar, setRecordar] = useState(false);
   const [cargando, setCargando] = useState(false);
+
+  // Al abrir la pantalla, si había credenciales recordadas, las autocompleta.
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(CRED_KEY);
+        if (raw) {
+          const cred = JSON.parse(raw);
+          if (cred.email) setEmail(cred.email);
+          if (cred.password) setPassword(cred.password);
+          setRecordar(true);
+        }
+      } catch (_) { /* ignorar */ }
+    })();
+  }, []);
 
   async function ingresar() {
     if (!email || !password) {
@@ -24,6 +44,12 @@ export default function LoginScreen({ navigation }) {
     setCargando(true);
     try {
       await login(email.trim(), password);
+      // Recordar o limpiar las credenciales según el check.
+      if (recordar) {
+        await AsyncStorage.setItem(CRED_KEY, JSON.stringify({ email: email.trim(), password }));
+      } else {
+        await AsyncStorage.removeItem(CRED_KEY);
+      }
       // La navegación al Home la dispara el cambio de estado de Auth.
     } catch (e) {
       Alert.alert('No se pudo iniciar sesión', e.message);
@@ -53,6 +79,16 @@ export default function LoginScreen({ navigation }) {
           value={email} onChangeText={setEmail} placeholder="tu@email.com" />
         <Campo label="Contraseña" secureTextEntry value={password}
           onChangeText={setPassword} placeholder="••••••" />
+
+        {/* "Recordarme": la propia app guarda y autocompleta email + contraseña. */}
+        <TouchableOpacity style={styles.recordarRow} onPress={() => setRecordar((v) => !v)} activeOpacity={0.7}>
+          <Ionicons
+            name={recordar ? 'checkbox' : 'square-outline'}
+            size={22}
+            color={recordar ? colors.azulMarino : colors.grisTexto}
+          />
+          <Text style={styles.recordarTxt}>Recordar email y contraseña</Text>
+        </TouchableOpacity>
 
         <Boton title="INGRESAR" size="lg" onPress={ingresar} loading={cargando} />
 
@@ -102,6 +138,8 @@ const crearStyles = (colors) => StyleSheet.create({
   },
   titulo: { fontSize: 21, fontWeight: '800', color: colors.azulMarino, textAlign: 'center' },
   subtitulo: { fontSize: 13, color: colors.grisTexto, textAlign: 'center', marginTop: 4, marginBottom: 18 },
+  recordarRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14, marginBottom: 4 },
+  recordarTxt: { color: colors.azulMarino, fontWeight: '600', fontSize: 13.5, marginLeft: 8 },
   olvido: { color: colors.naranja, textAlign: 'center', marginTop: 14, fontWeight: '600' },
   validar: { color: colors.azulMarino, textAlign: 'center', marginTop: 12, fontWeight: '700', fontSize: 13 },
   invitado: { color: colors.grisTexto, textAlign: 'center', marginTop: 14, fontWeight: '600', fontSize: 13 },
