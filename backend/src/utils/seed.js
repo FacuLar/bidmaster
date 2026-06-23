@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const {
   sequelize, Pais, Empleado, Sector, Persona, Cuenta, Cliente, Duenio, Subastador,
   Seguro, Subasta, Producto, Foto, Catalogo, ItemCatalogo, ClasificacionProducto, MedioPago,
+  Asistente, Pujo, RegistroDeSubasta, Multa, PropuestaVenta,
 } = require('../models');
 
 /**
@@ -88,7 +89,7 @@ async function seed() {
     });
     await Foto.bulkCreate(fotos(p.kw).map((f) => ({ producto: prod.identificador, foto: f })));
     await ClasificacionProducto.create({ producto: prod.identificador, categoria: p.categoria, tags: p.tags, uso: p.uso });
-    await ItemCatalogo.create({
+    return ItemCatalogo.create({
       catalogo, producto: prod.identificador, precioBase: p.precioBase,
       comision: Math.round(p.precioBase * 0.1), subastado: 'no',
     });
@@ -112,12 +113,61 @@ async function seed() {
     { descCatalogo: 'Camiseta de Fútbol Firmada', kw: 'soccer,jersey', categoria: 'moda', tags: ['Deportes', 'Raro'], uso: 'usado', precioBase: 65000 },
     { descCatalogo: 'Bicicleta de Alta Gama', kw: 'road,bicycle', categoria: 'vehiculos', tags: ['Exclusivo'], uso: 'poco_uso', precioBase: 150000 },
   ];
-  for (const p of plata) await crearProducto(catPlata.identificador, p);
+  const itemsPlata = [];
+  for (const p of plata) itemsPlata.push(await crearProducto(catPlata.identificador, p));
   for (const p of comun) await crearProducto(catComun.identificador, p);
+
+  /* ================================================================== */
+  /* DATOS HARDCODEADOS para probar TODAS las pantallas y decisiones      */
+  /* ================================================================== */
+
+  /* --- Usuario con MULTA (probar bloqueo + pago de multa) ----------- */
+  const multado = await crearCliente('Mateo Multado', '30444444', 'multado@ejemplo.com', 'comun');
+  await MedioPago.create({ cliente: multado, tipo: 'TARJETA', entidad: 'Visa', numeroIdentificador: '**** 9999', marca: 'VISA', titular: 'Mateo Multado', vencimiento: '11/29', moneda: 'ARS', saldoDisponible: 100000, estadoVerificacion: 'Verificado' });
+  await Multa.create({ cliente: multado, monto: 3000, fechaLimite: new Date(Date.now() + 3 * 24 * 3600 * 1000), estado: 'con_deuda' });
+
+  /* --- Solicitud de registro PENDIENTE (probar aprobación por admin) - */
+  const pPend = await Persona.create({ documento: '30555555', nombre: 'Paula Pendiente', direccion: 'Calle Esperando 100', estado: 'activo' });
+  await Cliente.create({ identificador: pPend.identificador, numeroPais: 32, admitido: 'no', categoria: 'comun' });
+  await Cuenta.create({ persona: pPend.identificador, email: 'pendiente@ejemplo.com' }); // sin clave hasta aprobarse
+
+  /* --- Medio de pago PENDIENTE de facundo (probar verificación admin) */
+  await MedioPago.create({ cliente: facundo, tipo: 'TARJETA', entidad: 'Amex', numeroIdentificador: '**** 0005', marca: 'AMEX', titular: 'Facundo Pérez', vencimiento: '03/31', moneda: 'ARS', saldoDisponible: 0, estadoVerificacion: 'Pendiente' });
+
+  /* --- PIEZAS GANADAS por facundo (probar "Mis Pujas": pagar / pagada) */
+  const asisFac = await Asistente.create({ cliente: facundo, subasta: subPlata.identificador, numeroPostor: 1 });
+  // (a) Ganada PENDIENTE de pago -> Olivetti (item 6, base 22000)
+  const itemGanadoPend = itemsPlata[5];
+  await Pujo.create({ asistente: asisFac.identificador, item: itemGanadoPend.identificador, importe: 22440, ganador: 'si' });
+  itemGanadoPend.subastado = 'si'; await itemGanadoPend.save();
+  // (b) Ganada y PAGADA -> Lámpara Art Déco (item 4, base 38000)
+  const itemGanadoPago = itemsPlata[3];
+  await Pujo.create({ asistente: asisFac.identificador, item: itemGanadoPago.identificador, importe: 38760, ganador: 'si' });
+  itemGanadoPago.subastado = 'si'; await itemGanadoPago.save();
+  await RegistroDeSubasta.create({ subasta: subPlata.identificador, duenio: duenio.identificador, producto: itemGanadoPago.producto, cliente: facundo, importe: 38760 + Math.round(38000 * 0.1), comision: Math.round(38000 * 0.1) });
+
+  /* --- TRÁMITES de vendedor de facundo (probar "Mis Artículos") ------ */
+  const seisFotos = fotos('antique,object');
+  const propuestaBase = { vendedor: facundo, fotos: seisFotos, medio_pago: null, tipo_bien: 'otro' };
+  await PropuestaVenta.bulkCreate([
+    // 1) Recién propuesto: la empresa quiere inspeccionarlo (decidís ENVIAR / CANCELAR)
+    { ...propuestaBase, titulo: 'Reloj de bolsillo de plata', descripcion: 'Reloj antiguo funcionando', estado: 'A inspeccionar' },
+    // 2) TASADO: la empresa lo aprobó y propuso valor (decidís ACEPTAR / RECHAZAR)  <-- lo que pediste
+    { ...propuestaBase, titulo: 'Cámara fotográfica vintage', descripcion: 'Cámara a rollo en caja', estado: 'Tasado', valor_base_sugerido: 35000, comisiones: 10, fecha_subasta: new Date(Date.now() + 14 * 24 * 3600 * 1000), ubicacion_deposito: 'Centro Logístico Sur - Pasillo 4B', seguro_compania: 'Seguros Patria S.A.', seguro_cobertura: 35000 },
+    // 3) RECHAZADO en inspección (decidís cómo recuperarlo: RETIRO / ENVÍO con flete)
+    { ...propuestaBase, titulo: 'Jarrón dañado', descripcion: 'Tiene una fisura', estado: 'Rechazado', motivo_rechazo: 'El bien no está en condiciones tras la inspección', ubicacion_deposito: 'Centro Logístico Sur - Pasillo 4B' },
+    // 4) PROGRAMADO: ya lo aceptaste y entró a una subasta
+    { ...propuestaBase, titulo: 'Mesa ratona de roble', descripcion: 'Restaurada', estado: 'Programado', valor_base_sugerido: 28000, comisiones: 10, fecha_subasta: new Date(Date.now() + 10 * 24 * 3600 * 1000) },
+    // 5) DEVUELTO: rechazaste la tasación
+    { ...propuestaBase, titulo: 'Bicicleta de paseo', descripcion: 'Usada', estado: 'Devuelto', motivo_rechazo: 'El vendedor no aceptó el valor base / comisiones' },
+  ]);
 
   // eslint-disable-next-line no-console
   console.log('✅ Seed (esquema cátedra) completo.');
-  console.log(`   ${plata.length + comun.length} productos · 2 subastas · clientes: facundo/oro/nuevo@ejemplo.com (pass: 123456)`);
+  console.log(`   ${plata.length + comun.length} productos · 2 subastas`);
+  console.log('   Clientes (pass 123456): facundo@ (plata) / oro@ (oro) / nuevo@ (comun)');
+  console.log('   + multado@ (multa pendiente) · pendiente@ (registro a aprobar por admin)');
+  console.log('   facundo: 2 piezas ganadas (1 a pagar, 1 pagada) · 5 trámites de venta · 1 medio Pendiente');
   await sequelize.close();
 }
 
