@@ -1,343 +1,218 @@
-const { Articulo, MedioPago, Pieza, Subasta } = require('../models');
+const {
+  PropuestaVenta, MedioPago, Subasta, Catalogo, ItemCatalogo, Producto, Foto,
+  ClasificacionProducto, Duenio, Empleado,
+} = require('../models');
 const { AppError, asyncHandler } = require('../middleware/errorHandler');
 
-/**
- * Devuelve (o crea) la subasta "programada" donde se incluyen los bienes que los
- * usuarios proponen y la empresa acepta. Permite probar el circuito completo:
- * un bien aceptado aparece en el catálogo y se puede rematar.
- */
-async function obtenerSubastaComunidad() {
-  let subasta = await Subasta.findOne({
-    where: { titulo: 'Subasta de la Comunidad', estado: 'programada' },
-  });
-  if (!subasta) {
-    const en7dias = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    subasta = await Subasta.create({
-      titulo: 'Subasta de la Comunidad', fecha: en7dias, hora: '19:00',
-      moneda: 'ARS', categoria_requerida: 'comun', rematador: 'BidMaster',
-      ubicacion: 'Salón Comunidad', estado: 'programada',
-    });
-  }
-  return subasta;
-}
+const COSTO_FLETE_DEVOLUCION = 1500;
+const COMISION_DEFAULT = 10;
 
-const COSTO_FLETE_DEVOLUCION = 1500; // cargo de flete por devolución (#13)
-const COMISION_DEFAULT = 10;         // % de comisión de la empresa
-
-/* ---- Reglas HARDCODEADAS de la empresa (#9 interés, #12 inspección) ---- */
-// ¿Le interesa el bien a la empresa para subastar? (hardcodeado)
 function leInteresa(titulo) {
   const t = (titulo || '').toLowerCase();
   if (t.trim().length < 3) return false;
   return !/(rot[oa]|basura|replica|trucho|fals[oa]|chatarra|quemad[oa])/.test(t);
 }
-// Tras la inspección física, ¿el bien está en condiciones? (hardcodeado)
 function enCondiciones(titulo) {
   const t = (titulo || '').toLowerCase();
   return !/(dudos[oa]|dañad[oa]|deteriorad[oa]|incomplet[oa]|roto|rota)/.test(t);
 }
 
-/* 5.0 Listar Mis Artículos — GET /vendedores/articulos
-   El vendedor NO ve historial de la subasta, solo el resultado (#19). */
+// Asegura un Duenio para el cliente (Producto.duenio lo requiere).
+async function asegurarDuenio(clienteId) {
+  let d = await Duenio.findByPk(clienteId);
+  if (!d) d = await Duenio.create({ identificador: clienteId, numeroPais: 32, verificacionFinanciera: 'si', verificacionJudicial: 'si', calificacionRiesgo: 3 });
+  return d;
+}
+async function unEmpleado() { return (await Empleado.findOne()) || Empleado.create({ cargo: 'Revisor' }); }
+
+// Subasta "de la Comunidad" (abierta) + su catálogo, donde caen los bienes aceptados.
+async function obtenerComunidad() {
+  let subasta = await Subasta.findOne({ where: { ubicacion: 'Salón Comunidad', estado: 'abierta' } });
+  if (!subasta) {
+    const en7 = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    subasta = await Subasta.create({ fecha: en7, hora: '19:00', estado: 'abierta', ubicacion: 'Salón Comunidad', capacidadAsistentes: 200, tieneDeposito: 'si', seguridadPropia: 'no', categoria: 'comun' });
+  }
+  let cat = await Catalogo.findOne({ where: { subasta: subasta.identificador } });
+  if (!cat) { const emp = await unEmpleado(); cat = await Catalogo.create({ descripcion: 'Subasta de la Comunidad', subasta: subasta.identificador, responsable: emp.identificador }); }
+  return { subasta, cat };
+}
+
+function mapPropuesta(p) {
+  return {
+    id_tramite: p.identificador,
+    titulo: p.titulo,
+    tipo_bien: p.tipo_bien,
+    estado: p.estado,
+    valor_base_sugerido: p.valor_base_sugerido != null ? Number(p.valor_base_sugerido) : null,
+    comisiones: p.comisiones,
+    fecha_subasta: p.fecha_subasta,
+    monto_venta: p.monto_venta != null ? Number(p.monto_venta) : null,
+    comision_cobrada: p.monto_venta != null ? +(Number(p.monto_venta) * (p.comisiones || COMISION_DEFAULT) / 100).toFixed(2) : null,
+    metodo_devolucion: p.metodo_devolucion,
+    costo_flete: p.costo_flete != null ? Number(p.costo_flete) : null,
+    ubicacion_deposito: p.ubicacion_deposito,
+    motivo_rechazo: p.motivo_rechazo,
+    fecha_ingreso: p.createdAt,
+  };
+}
+
+/* 5.0 GET /vendedores/articulos */
 const listarArticulos = asyncHandler(async (req, res) => {
-  const articulos = await Articulo.findAll({
-    where: { usuario_id: req.usuario.id },
-    order: [['createdAt', 'DESC']],
-  });
-  const data = articulos.map((a) => ({
-    id_tramite: a.id_tramite,
-    titulo: a.titulo,
-    tipo_bien: a.tipo_bien,
-    estado: a.estado,
-    valor_base_sugerido: a.valor_base_sugerido,
-    comisiones: a.comisiones,
-    fecha_subasta: a.fecha_subasta,
-    monto_venta: a.monto_venta,
-    comision_cobrada: a.monto_venta != null ? +(a.monto_venta * (a.comisiones || COMISION_DEFAULT) / 100).toFixed(2) : null,
-    metodo_devolucion: a.metodo_devolucion,
-    costo_flete: a.costo_flete,
-    ubicacion_deposito: a.ubicacion_deposito,
-    motivo_rechazo: a.motivo_rechazo,
-    fecha_ingreso: a.createdAt,
-  }));
-  res.status(200).json(data);
+  const props = await PropuestaVenta.findAll({ where: { vendedor: req.usuario.id }, order: [['createdAt', 'DESC']] });
+  res.status(200).json(props.map(mapPropuesta));
 });
 
-/* 5.1 Proponer un Bien — POST /vendedores/articulos
-   Valida cuenta corriente (#20), 6 fotos, T&C, prueba (QR si es auto, #10) y
-   evalúa el interés de la empresa (hardcodeado, #9). */
+/* 5.1 POST /vendedores/articulos */
 const proponerArticulo = asyncHandler(async (req, res) => {
   const {
-    titulo, descripcion, historia, fotos, tipo_bien,
-    qr_titulo, compraventa, fotos_prueba, medio_pago_id,
-    acepta_devolucion, acepta_terminos, declaracion_jurada_licita, acredita_origen,
+    titulo, descripcion, historia, fotos, tipo_bien, qr_titulo, medio_pago_id,
+    acepta_devolucion, acepta_terminos, declaracion_jurada_licita,
   } = req.body;
-
   if (!titulo) throw new AppError('El título del bien es obligatorio', 400);
-  if (!Array.isArray(fotos) || fotos.length < 6) {
-    throw new AppError('Se requieren al menos 6 fotos del bien', 400);
-  }
-  if (!declaracion_jurada_licita || !acepta_devolucion) {
-    throw new AppError('Debés aceptar las declaraciones juradas obligatorias', 400);
-  }
-  if (!acepta_terminos) {
-    throw new AppError('Debés aceptar los términos y condiciones', 400);
-  }
-  // Si es un auto, exige el QR del título como prueba de propiedad (#10).
-  if (tipo_bien === 'auto' && !qr_titulo) {
-    throw new AppError('Para un automóvil necesitás adjuntar el QR del título', 400);
-  }
-  // Los vendedores solo operan con cuenta corriente (#20). El usuario elige cuál
-  // (medio_pago_id); si no la manda, se toma la primera cuenta que tenga.
+  if (!Array.isArray(fotos) || fotos.length < 6) throw new AppError('Se requieren al menos 6 fotos del bien', 400);
+  if (!declaracion_jurada_licita || !acepta_devolucion) throw new AppError('Debés aceptar las declaraciones juradas obligatorias', 400);
+  if (!acepta_terminos) throw new AppError('Debés aceptar los términos y condiciones', 400);
+  if (tipo_bien === 'auto' && !qr_titulo) throw new AppError('Para un automóvil necesitás adjuntar el QR del título', 400);
+
   let cuenta;
   if (medio_pago_id) {
-    cuenta = await MedioPago.findOne({
-      where: { id: medio_pago_id, usuario_id: req.usuario.id, tipo: 'CUENTA' },
-    });
+    cuenta = await MedioPago.findOne({ where: { identificador: medio_pago_id, cliente: req.usuario.id, tipo: 'CUENTA' } });
     if (!cuenta) throw new AppError('La cuenta elegida no es válida', 400);
   } else {
-    cuenta = await MedioPago.findOne({ where: { usuario_id: req.usuario.id, tipo: 'CUENTA' } });
+    cuenta = await MedioPago.findOne({ where: { cliente: req.usuario.id, tipo: 'CUENTA' } });
   }
-  if (!cuenta) {
-    throw new AppError('Para vender necesitás una cuenta corriente registrada en tu billetera', 400);
-  }
+  if (!cuenta) throw new AppError('Para vender necesitás una cuenta corriente registrada en tu billetera', 400);
 
-  // ¿Le interesa a la empresa? (hardcodeado)
   const interesa = leInteresa(titulo);
-
-  const articulo = await Articulo.create({
-    titulo, descripcion, historia,
-    tipo_bien: tipo_bien || 'otro',
-    fotos,
-    qr_titulo: qr_titulo || null,
-    compraventa: compraventa || null,
-    fotos_prueba: Array.isArray(fotos_prueba) ? fotos_prueba : [],
-    acepta_devolucion: !!acepta_devolucion,
-    acepta_terminos: !!acepta_terminos,
-    declaracion_jurada_licita: !!declaracion_jurada_licita,
-    acredita_origen: !!acredita_origen,
+  const p = await PropuestaVenta.create({
+    vendedor: req.usuario.id, titulo, descripcion, historia, tipo_bien: tipo_bien || 'otro',
+    fotos, qr_titulo: qr_titulo || null, medio_pago: cuenta.identificador,
     estado: interesa ? 'A inspeccionar' : 'Rechazado',
     motivo_rechazo: interesa ? null : 'El bien no es de interés para las subastas actuales',
-    medio_pago_id: cuenta.id,
-    usuario_id: req.usuario.id,
   });
-
   res.status(201).json({
-    id_tramite: articulo.id_tramite,
-    estado: articulo.estado,
-    interesa,
-    mensaje: interesa
-      ? 'Nos interesa tu bien. Tenés que traerlo al depósito para inspeccionarlo.'
-      : 'El bien no es de interés para las subastas en este momento.',
+    id_tramite: p.identificador, estado: p.estado, interesa,
+    mensaje: interesa ? 'Nos interesa tu bien. Traelo al depósito para inspeccionarlo.' : 'El bien no es de interés en este momento.',
   });
 });
 
-/* 5.2 Confirmar envío a inspección — PATCH /vendedores/articulos/:id/inspeccion
-   La empresa pide traer el bien; el usuario decide enviarlo o no (#11). Si lo
-   envía, se inspecciona (hardcodeado, #12): tasación o rechazo con flete (#12/#13). */
+const buscarPropuesta = async (id, clienteId) => PropuestaVenta.findOne({ where: { identificador: id, vendedor: clienteId } });
+
+/* 5.2 PATCH /vendedores/articulos/:id/inspeccion */
 const confirmarInspeccion = asyncHandler(async (req, res) => {
-  const { decision } = req.body; // ENVIAR / CANCELAR
-  const articulo = await Articulo.findOne({
-    where: { id_tramite: req.params.id, usuario_id: req.usuario.id },
-  });
-  if (!articulo) throw new AppError('Artículo no encontrado', 404);
-  if (articulo.estado !== 'A inspeccionar') {
-    throw new AppError('El artículo no está esperando inspección', 400);
-  }
+  const { decision } = req.body;
+  const p = await buscarPropuesta(req.params.id, req.usuario.id);
+  if (!p) throw new AppError('Artículo no encontrado', 404);
+  if (p.estado !== 'A inspeccionar') throw new AppError('El artículo no está esperando inspección', 400);
 
-  if (decision === 'CANCELAR') {
-    articulo.estado = 'Cancelado';
-    await articulo.save();
-    return res.status(200).json({ estado: articulo.estado, mensaje: 'Cancelaste el envío del bien.' });
-  }
-  if (decision !== 'ENVIAR') {
-    throw new AppError('Decisión inválida (ENVIAR / CANCELAR)', 400);
-  }
+  if (decision === 'CANCELAR') { p.estado = 'Cancelado'; await p.save(); return res.status(200).json({ estado: p.estado, mensaje: 'Cancelaste el envío del bien.' }); }
+  if (decision !== 'ENVIAR') throw new AppError('Decisión inválida (ENVIAR / CANCELAR)', 400);
 
-  // Inspección física (resultado hardcodeado).
-  if (enCondiciones(articulo.titulo)) {
-    articulo.estado = 'Tasado';
-    articulo.valor_base_sugerido = articulo.valor_base_sugerido || 12000;
-    articulo.comisiones = COMISION_DEFAULT;
-    articulo.fecha_subasta = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // +14 días
-    articulo.ubicacion_deposito = 'Centro Logístico Sur - Pasillo 4B';
-    articulo.seguro_compania = 'Seguros Patria S.A.';
-    articulo.seguro_cobertura = articulo.valor_base_sugerido;
-    await articulo.save();
+  if (enCondiciones(p.titulo)) {
+    p.estado = 'Tasado';
+    p.valor_base_sugerido = p.valor_base_sugerido || 12000;
+    p.comisiones = COMISION_DEFAULT;
+    p.fecha_subasta = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    p.ubicacion_deposito = 'Centro Logístico Sur - Pasillo 4B';
+    p.seguro_compania = 'Seguros Patria S.A.';
+    p.seguro_cobertura = p.valor_base_sugerido;
+    await p.save();
     return res.status(200).json({
-      estado: articulo.estado,
-      tasacion: {
-        valor_base: articulo.valor_base_sugerido,
-        comision_porcentaje: articulo.comisiones,
-        fecha_subasta: articulo.fecha_subasta,
-      },
+      estado: p.estado,
+      tasacion: { valor_base: Number(p.valor_base_sugerido), comision_porcentaje: p.comisiones, fecha_subasta: p.fecha_subasta },
       mensaje: 'El bien pasó la inspección. Revisá la tasación propuesta.',
     });
   }
-
-  // No está en condiciones: rechazo. El usuario elige cómo recuperar el bien:
-  // retirarlo él (#12) o que se lo devuelvan con cargo de flete (#13).
-  articulo.estado = 'Rechazado';
-  articulo.motivo_rechazo = 'El bien no está en condiciones tras la inspección';
-  await articulo.save();
-  res.status(200).json({
-    estado: articulo.estado,
-    mensaje: 'El bien no está en condiciones. Retiralo del depósito o pedí la devolución con cargo de flete.',
-  });
+  p.estado = 'Rechazado';
+  p.motivo_rechazo = 'El bien no está en condiciones tras la inspección';
+  await p.save();
+  res.status(200).json({ estado: p.estado, mensaje: 'El bien no está en condiciones. Retiralo o pedí la devolución con cargo de flete.' });
 });
 
-/* 5.x Elegir cómo recuperar un bien rechazado — PATCH /vendedores/articulos/:id/devolucion
-   RETIRO: lo busca el usuario, sin cargo (#12). ENVIO: se devuelve con flete (#13). */
-const confirmarDevolucion = asyncHandler(async (req, res) => {
-  const { metodo } = req.body; // RETIRO / ENVIO
-  const articulo = await Articulo.findOne({
-    where: { id_tramite: req.params.id, usuario_id: req.usuario.id },
-  });
-  if (!articulo) throw new AppError('Artículo no encontrado', 404);
-  if (!['Rechazado', 'Devuelto'].includes(articulo.estado)) {
-    throw new AppError('Este artículo no está en devolución', 400);
-  }
+/* 5.3 PATCH /vendedores/articulos/:id/condiciones */
+const responderCondiciones = asyncHandler(async (req, res) => {
+  const { decision } = req.body;
+  const p = await buscarPropuesta(req.params.id, req.usuario.id);
+  if (!p) throw new AppError('Artículo no encontrado', 404);
+  if (p.estado !== 'Tasado') throw new AppError('El artículo no tiene una tasación pendiente de respuesta', 400);
 
-  if (metodo === 'RETIRO') {
-    articulo.metodo_devolucion = 'retiro';
-    articulo.costo_flete = 0;
-    if (!articulo.ubicacion_deposito) articulo.ubicacion_deposito = 'Centro Logístico Sur - Pasillo 4B';
-    await articulo.save();
+  if (decision === 'ACEPTAR') {
+    const { subasta, cat } = await obtenerComunidad();
+    await asegurarDuenio(req.usuario.id);
+    const emp = await unEmpleado();
+    const base = Number(p.valor_base_sugerido) || 10000;
+    const prod = await Producto.create({
+      fecha: subasta.fecha, disponible: 'si',
+      descripcionCatalogo: p.titulo, descripcionCompleta: p.descripcion || p.titulo,
+      revisor: emp.identificador, duenio: req.usuario.id,
+    });
+    const imgs = Array.isArray(p.fotos) ? p.fotos : [];
+    if (imgs.length) await Foto.bulkCreate(imgs.map((f) => ({ producto: prod.identificador, foto: f })));
+    await ClasificacionProducto.create({ producto: prod.identificador, categoria: p.tipo_bien || 'otros', tags: [], uso: 'usado' });
+    const item = await ItemCatalogo.create({ catalogo: cat.identificador, producto: prod.identificador, precioBase: base, comision: Math.round(base * 0.1), subastado: 'no' });
+
+    p.estado = 'Programado';
+    p.producto = prod.identificador;
+    p.fecha_subasta = subasta.fecha;
+    await p.save();
     return res.status(200).json({
-      metodo: 'retiro',
-      mensaje: `Podés retirar el bien en ${articulo.ubicacion_deposito}, sin cargo.`,
+      estado: p.estado, mensaje: 'Aceptaste. Tu bien quedó incluido en la Subasta de la Comunidad y ya se puede subastar.',
+      id_subasta: subasta.identificador, id_pieza: item.identificador, fecha_subasta: subasta.fecha,
     });
   }
+  if (decision === 'RECHAZAR') {
+    p.estado = 'Devuelto';
+    p.motivo_rechazo = 'El vendedor no aceptó el valor base / comisiones';
+    await p.save();
+    return res.status(200).json({ estado: p.estado, mensaje: 'Rechazaste la tasación. Retirá el bien o pedí la devolución con cargo de flete.' });
+  }
+  throw new AppError('Decisión inválida (ACEPTAR / RECHAZAR)', 400);
+});
+
+/* 5.x PATCH /vendedores/articulos/:id/devolucion */
+const confirmarDevolucion = asyncHandler(async (req, res) => {
+  const { metodo } = req.body;
+  const p = await buscarPropuesta(req.params.id, req.usuario.id);
+  if (!p) throw new AppError('Artículo no encontrado', 404);
+  if (!['Rechazado', 'Devuelto'].includes(p.estado)) throw new AppError('Este artículo no está en devolución', 400);
+
+  if (metodo === 'RETIRO') {
+    p.metodo_devolucion = 'retiro'; p.costo_flete = 0;
+    if (!p.ubicacion_deposito) p.ubicacion_deposito = 'Centro Logístico Sur - Pasillo 4B';
+    await p.save();
+    return res.status(200).json({ metodo: 'retiro', mensaje: `Podés retirar el bien en ${p.ubicacion_deposito}, sin cargo.` });
+  }
   if (metodo === 'ENVIO') {
-    articulo.metodo_devolucion = 'envio';
-    articulo.costo_flete = COSTO_FLETE_DEVOLUCION;
-    await articulo.save();
-
-    // El flete se cobra con cargo al vendedor: se descuenta de la cuenta que
-    // eligió al proponer el bien (o, si no hay, la primera cuenta que tenga).
+    p.metodo_devolucion = 'envio'; p.costo_flete = COSTO_FLETE_DEVOLUCION;
+    await p.save();
     let saldo_restante = null;
-    let cuenta = articulo.medio_pago_id
-      ? await MedioPago.findOne({ where: { id: articulo.medio_pago_id, usuario_id: req.usuario.id } })
-      : null;
-    if (!cuenta) {
-      cuenta = await MedioPago.findOne({
-        where: { usuario_id: req.usuario.id, tipo: 'CUENTA' },
-        order: [['saldo_disponible', 'DESC']],
-      });
-    }
-    if (cuenta) {
-      cuenta.saldo_disponible = Math.max(0, cuenta.saldo_disponible - COSTO_FLETE_DEVOLUCION);
-      await cuenta.save();
-      saldo_restante = cuenta.saldo_disponible;
-    }
-
+    let cuenta = p.medio_pago ? await MedioPago.findOne({ where: { identificador: p.medio_pago, cliente: req.usuario.id } }) : null;
+    if (!cuenta) cuenta = await MedioPago.findOne({ where: { cliente: req.usuario.id, tipo: 'CUENTA' }, order: [['saldoDisponible', 'DESC']] });
+    if (cuenta) { cuenta.saldoDisponible = Math.max(0, Number(cuenta.saldoDisponible) - COSTO_FLETE_DEVOLUCION); await cuenta.save(); saldo_restante = Number(cuenta.saldoDisponible); }
     return res.status(200).json({
-      metodo: 'envio',
-      costo_flete: articulo.costo_flete,
-      saldo_restante,
-      mensaje: cuenta
-        ? `Se devuelve a tu domicilio. Se descontaron $${COSTO_FLETE_DEVOLUCION} de tu cuenta por el flete.`
-        : 'Se devuelve a tu domicilio con cargo de flete. Revisá la factura.',
+      metodo: 'envio', costo_flete: COSTO_FLETE_DEVOLUCION, saldo_restante,
+      mensaje: cuenta ? `Se devuelve a tu domicilio. Se descontaron $${COSTO_FLETE_DEVOLUCION} por el flete.` : 'Se devuelve con cargo de flete. Revisá la factura.',
     });
   }
   throw new AppError('Método inválido (RETIRO / ENVIO)', 400);
 });
 
-/* 5.3 Aceptar/Rechazar Tasación — PATCH /vendedores/articulos/:id/condiciones (#14)
-   El usuario acepta el valor base + comisión + fecha, o cancela (devolución con cargo). */
-const responderCondiciones = asyncHandler(async (req, res) => {
-  const { decision } = req.body; // ACEPTAR / RECHAZAR
-  const articulo = await Articulo.findOne({
-    where: { id_tramite: req.params.id, usuario_id: req.usuario.id },
-  });
-  if (!articulo) throw new AppError('Artículo no encontrado', 404);
-  if (articulo.estado !== 'Tasado') {
-    throw new AppError('El artículo no tiene una tasación pendiente de respuesta', 400);
-  }
-
-  if (decision === 'ACEPTAR') {
-    // Al aceptar, el bien se incluye en una subasta real (programada) como pieza,
-    // así puede rematarse y probar todo el circuito vendedor -> comprador.
-    const subasta = await obtenerSubastaComunidad();
-    const maxNro = (await Pieza.max('nro_pieza', { where: { subasta_id: subasta.id } })) || 900;
-    const pieza = await Pieza.create({
-      nro_pieza: maxNro + 1,
-      titulo: articulo.titulo,
-      descripcion: articulo.descripcion,
-      historia: articulo.historia,
-      precio_base: articulo.valor_base_sugerido || 10000,
-      imagenes: Array.isArray(articulo.fotos) ? articulo.fotos : [],
-      subasta_id: subasta.id,
-      dueno_id: req.usuario.id,
-      estado: 'en_subasta',
-    });
-
-    articulo.estado = 'Programado';
-    articulo.pieza_id = pieza.id;
-    articulo.fecha_subasta = subasta.fecha;
-    await articulo.save();
-
-    return res.status(200).json({
-      estado: articulo.estado,
-      mensaje: `Aceptaste. Tu bien quedó incluido en "${subasta.titulo}" y ya se puede subastar.`,
-      id_subasta: subasta.id,
-      id_pieza: pieza.id,
-      fecha_subasta: subasta.fecha,
-    });
-  }
-  if (decision === 'RECHAZAR') {
-    articulo.estado = 'Devuelto';
-    articulo.motivo_rechazo = 'El vendedor no aceptó el valor base / comisiones';
-    await articulo.save();
-    return res.status(200).json({
-      estado: articulo.estado,
-      mensaje: 'Rechazaste la tasación. Retirá el bien o pedí la devolución con cargo de flete.',
-    });
-  }
-  throw new AppError('Decisión inválida (ACEPTAR / RECHAZAR)', 400);
-});
-
-/* 5.4 Factura del flete de devolución — GET /vendedores/articulos/:id/factura-flete (#13) */
+/* 5.4 GET /vendedores/articulos/:id/factura-flete */
 const facturaFlete = asyncHandler(async (req, res) => {
-  const articulo = await Articulo.findOne({
-    where: { id_tramite: req.params.id, usuario_id: req.usuario.id },
-  });
-  if (!articulo) throw new AppError('Artículo no encontrado', 404);
-  if (articulo.metodo_devolucion !== 'envio' || !articulo.costo_flete) {
-    throw new AppError('Este artículo no tiene una devolución con cargo', 400);
-  }
-  res.status(200).json({
-    id_tramite: articulo.id_tramite,
-    titulo: articulo.titulo,
-    concepto: 'Devolución del bien con cargo al vendedor',
-    motivo: articulo.motivo_rechazo,
-    costo_flete: articulo.costo_flete,
-    total: articulo.costo_flete,
-  });
+  const p = await buscarPropuesta(req.params.id, req.usuario.id);
+  if (!p) throw new AppError('Artículo no encontrado', 404);
+  if (p.metodo_devolucion !== 'envio' || !p.costo_flete) throw new AppError('Este artículo no tiene una devolución con cargo', 400);
+  res.status(200).json({ id_tramite: p.identificador, titulo: p.titulo, concepto: 'Devolución del bien con cargo al vendedor', motivo: p.motivo_rechazo, costo_flete: Number(p.costo_flete), total: Number(p.costo_flete) });
 });
 
-/* 5.5 Seguimiento y Póliza de Seguro — GET /vendedores/articulos/:id/logistica */
+/* 5.5 GET /vendedores/articulos/:id/logistica */
 const logistica = asyncHandler(async (req, res) => {
-  const articulo = await Articulo.findOne({
-    where: { id_tramite: req.params.id, usuario_id: req.usuario.id },
-  });
-  if (!articulo) throw new AppError('Artículo no encontrado', 404);
-
+  const p = await buscarPropuesta(req.params.id, req.usuario.id);
+  if (!p) throw new AppError('Artículo no encontrado', 404);
   res.status(200).json({
-    ubicacion_deposito: articulo.ubicacion_deposito || 'Pendiente de asignación',
-    seguro: {
-      compania: articulo.seguro_compania || 'Pendiente',
-      cobertura: articulo.seguro_cobertura || 0,
-    },
+    ubicacion_deposito: p.ubicacion_deposito || 'Pendiente de asignación',
+    seguro: { compania: p.seguro_compania || 'Pendiente', cobertura: p.seguro_cobertura ? Number(p.seguro_cobertura) : 0 },
   });
 });
 
-module.exports = {
-  listarArticulos,
-  proponerArticulo,
-  confirmarInspeccion,
-  responderCondiciones,
-  confirmarDevolucion,
-  facturaFlete,
-  logistica,
-};
+module.exports = { listarArticulos, proponerArticulo, confirmarInspeccion, responderCondiciones, confirmarDevolucion, facturaFlete, logistica };

@@ -1,119 +1,81 @@
-const { Pieza, Venta, Usuario, MedioPago, Multa } = require('../models');
+const {
+  ItemCatalogo, Producto, Catalogo, Pujo, Asistente, RegistroDeSubasta, Multa,
+} = require('../models');
 
-const COMISION = 0.10;       // 10% sobre lo pujado
-const COSTO_ENVIO = 850;     // costo de envío a domicilio (a cargo del comprador)
-const MULTA_PORC = 0.10;     // multa = 10% del valor ofertado
+const COSTO_ENVIO = 850;
+const MULTA_PORC = 0.10;
 const HORAS_MULTA = 72;
 
-/**
- * Calcula el desglose de la liquidación para el ganador de una pieza.
- * retiroPersonal=true => sin costo de envío (pierde la cobertura del seguro).
- */
-function calcularFactura(pieza, { retiroPersonal = false } = {}) {
-  const monto_pujado = pieza.oferta_actual;
-  const comision = +(monto_pujado * COMISION).toFixed(2);
+/** Factura del ganador de un ítem. La comisión sale del itemsCatalogo. */
+function calcularFactura(item, montoPujado, { retiroPersonal = false } = {}) {
+  const monto_pujado = Number(montoPujado);
+  const comision = Number(item.comision);
   const costo_envio = retiroPersonal ? 0 : COSTO_ENVIO;
-  const total = +(monto_pujado + comision + costo_envio).toFixed(2);
-  return { monto_pujado, comision, costo_envio, total };
+  return { monto_pujado, comision, costo_envio, total: +(monto_pujado + comision + costo_envio).toFixed(2) };
 }
 
-/**
- * Cierra una pieza al finalizar la subasta.
- * - Si hubo ofertas: el líder es el nuevo dueño y se registra la venta.
- * - Si no hubo ofertas: la empresa la compra al precio base.
- */
-async function cerrarPieza(piezaId) {
-  const pieza = await Pieza.findByPk(piezaId);
-  if (!pieza || pieza.estado === 'vendida') return null;
+/** Pujo ganador (mayor importe) de un ítem + el cliente. */
+async function pujoGanador(itemId) {
+  return Pujo.findOne({ where: { item: itemId }, order: [['importe', 'DESC']], include: [{ model: Asistente, as: 'asistenteRel' }] });
+}
 
-  if (!pieza.lider_id) {
-    // Sin ofertas: la empresa la compra al valor base.
-    pieza.estado = 'sin_ofertas';
-    await pieza.save();
-    return { resultado: 'compra_empresa', precio: pieza.precio_base };
+/** Cierra un ítem: marca subastado y deja el pujo ganador. Devuelve el resultado. */
+async function cerrarItem(itemId) {
+  const item = await ItemCatalogo.findByPk(itemId);
+  if (!item || item.subastado === 'si') return null;
+  const top = await pujoGanador(itemId);
+  item.subastado = 'si';
+  await item.save();
+  if (top) {
+    top.ganador = 'si';
+    await top.save();
+    return { resultado: 'vendida', lider_id: top.asistenteRel ? top.asistenteRel.cliente : null, importe: Number(top.importe) };
   }
-
-  const { monto_pujado, comision, costo_envio, total } = calcularFactura(pieza);
-  const venta = await Venta.create({
-    monto_pujado,
-    comision,
-    costo_envio,
-    total,
-    pieza_id: pieza.id,
-    usuario_id: pieza.lider_id,
-  });
-
-  // Nuevo dueño + pieza vendida.
-  pieza.dueno_id = pieza.lider_id;
-  pieza.estado = 'vendida';
-  await pieza.save();
-
-  return { resultado: 'vendida', venta };
+  return { resultado: 'sin_ofertas', lider_id: null };
 }
 
-/**
- * Aplica una multa del 10% del valor ofertado cuando el ganador no puede pagar.
- * Suspende la cuenta hasta que regularice y otorga 72hs de plazo.
- */
-async function aplicarMulta(usuarioId, valorOfertado) {
-  const monto = +(valorOfertado * MULTA_PORC).toFixed(2);
-  const fecha_limite = new Date(Date.now() + HORAS_MULTA * 60 * 60 * 1000);
-  const multa = await Multa.create({
-    monto,
-    fecha_limite,
-    usuario_id: usuarioId,
+/** Aplica una multa (10% del valor ofertado) al cliente. */
+async function aplicarMulta(clienteId, valorOfertado) {
+  return Multa.create({
+    cliente: clienteId,
+    monto: +(valorOfertado * MULTA_PORC).toFixed(2),
+    fechaLimite: new Date(Date.now() + HORAS_MULTA * 3600 * 1000),
     estado: 'con_deuda',
   });
-  await Usuario.update({ estado: 'suspendido' }, { where: { id: usuarioId } });
-  return multa;
 }
 
-/**
- * Procesa el pago de una pieza ganada con un medio de pago.
- * - Si el medio es un cheque y el total supera su saldo -> multa del 10%.
- * - Si alcanza -> registra/actualiza la venta como pagada y descuenta el saldo
- *   del cheque (las compras con cheque no pueden superar el monto certificado).
- */
-async function pagarPieza({ usuario, pieza, medio, retiroPersonal }) {
-  const f = calcularFactura(pieza, { retiroPersonal });
+/** Paga un ítem ganado: descuenta del medio y registra la venta; si no alcanza,
+ *  aplica multa. */
+async function pagarPieza({ usuario, item, medio, retiroPersonal }) {
+  const top = await pujoGanador(item.identificador);
+  const montoPujado = top ? Number(top.importe) : Number(item.precioBase);
+  const f = calcularFactura(item, montoPujado, { retiroPersonal });
 
-  // Fondos del medio de pago (tarjeta, cuenta o cheque): si el total supera el
-  // saldo disponible, no puede pagar -> multa del 10%.
-  if (f.total > medio.saldo_disponible) {
-    const multa = await aplicarMulta(usuario.id, pieza.oferta_actual);
+  if (f.total > Number(medio.saldoDisponible)) {
+    const multa = await aplicarMulta(usuario.id, montoPujado);
     return { ok: false, multa, factura: f };
   }
 
-  // Registra/actualiza la venta como pagada.
-  let venta = await Venta.findOne({ where: { pieza_id: pieza.id, usuario_id: usuario.id } });
-  if (!venta) {
-    venta = await Venta.create({
-      monto_pujado: f.monto_pujado, comision: f.comision, costo_envio: f.costo_envio,
-      total: f.total, retiro_personal: !!retiroPersonal,
-      pieza_id: pieza.id, usuario_id: usuario.id, medio_pago_id: medio.id,
+  // Producto -> duenio y subasta del item.
+  const prod = await Producto.findByPk(item.producto);
+  const cat = await Catalogo.findByPk(item.catalogo);
+
+  // Evita doble registro.
+  const existe = await RegistroDeSubasta.findOne({ where: { producto: item.producto, cliente: usuario.id } });
+  if (!existe) {
+    await RegistroDeSubasta.create({
+      subasta: cat ? cat.subasta : null,
+      duenio: prod ? prod.duenio : null,
+      producto: item.producto,
+      cliente: usuario.id,
+      importe: f.total,
+      comision: f.comision,
     });
   }
-  venta.estado_pago = 'pagada';
-  venta.medio_pago_id = medio.id;
-  await venta.save();
-
-  // Se descuenta el dinero del medio de pago utilizado (tarjeta/cuenta/cheque).
-  medio.saldo_disponible -= f.total;
+  medio.saldoDisponible = Number(medio.saldoDisponible) - f.total;
   await medio.save();
-
-  // Nuevo dueño + pieza vendida.
-  pieza.dueno_id = usuario.id;
-  pieza.estado = 'vendida';
-  await pieza.save();
-
-  return { ok: true, venta, factura: f };
+  if (item.subastado !== 'si') { item.subastado = 'si'; await item.save(); }
+  return { ok: true, factura: f };
 }
 
-module.exports = {
-  COMISION,
-  COSTO_ENVIO,
-  calcularFactura,
-  cerrarPieza,
-  aplicarMulta,
-  pagarPieza,
-};
+module.exports = { calcularFactura, cerrarItem, aplicarMulta, pagarPieza, COSTO_ENVIO };

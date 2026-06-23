@@ -198,6 +198,33 @@ const ClasificacionProducto = sequelize.define('ClasificacionProducto', {
   uso: { type: DataTypes.STRING },
 }, { tableName: 'clasificacionProducto', timestamps: false });
 
+// Trámite de inclusión de un bien que propone un cliente-vendedor (módulo 5).
+// No está en el esquema de la cátedra; al aceptarse se materializa en un
+// Producto + ItemCatalogo reales.
+const PropuestaVenta = sequelize.define('PropuestaVenta', {
+  identificador: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  vendedor: { type: DataTypes.INTEGER, allowNull: false }, // FK -> clientes
+  titulo: { type: DataTypes.STRING, allowNull: false },
+  descripcion: { type: DataTypes.STRING },
+  historia: { type: DataTypes.STRING },
+  tipo_bien: { type: DataTypes.STRING, defaultValue: 'otro' },
+  fotos: { type: DataTypes.JSON, defaultValue: [] },
+  qr_titulo: { type: DataTypes.TEXT },
+  estado: { type: DataTypes.STRING, defaultValue: 'A inspeccionar' },
+  valor_base_sugerido: { type: DataTypes.DECIMAL(18, 2) },
+  comisiones: { type: DataTypes.INTEGER, defaultValue: 10 },
+  fecha_subasta: { type: DataTypes.DATE },
+  monto_venta: { type: DataTypes.DECIMAL(18, 2) },
+  metodo_devolucion: { type: DataTypes.STRING },
+  costo_flete: { type: DataTypes.DECIMAL(18, 2) },
+  ubicacion_deposito: { type: DataTypes.STRING },
+  motivo_rechazo: { type: DataTypes.STRING },
+  seguro_compania: { type: DataTypes.STRING },
+  seguro_cobertura: { type: DataTypes.DECIMAL(18, 2) },
+  medio_pago: { type: DataTypes.INTEGER }, // FK -> mediosPago
+  producto: { type: DataTypes.INTEGER }, // FK -> productos (al aceptarse)
+}, { tableName: 'propuestasVenta', timestamps: true });
+
 /* ============================ Asociaciones (FKs) ========================== */
 
 // Subtipos de persona (1—1).
@@ -258,10 +285,13 @@ MedioPago.belongsTo(Cliente, { foreignKey: 'cliente', as: 'clienteRel' });
 Cliente.hasMany(MedioPago, { foreignKey: 'cliente', as: 'mediosPago' });
 Multa.belongsTo(Cliente, { foreignKey: 'cliente', as: 'clienteRel' });
 Cliente.hasMany(Multa, { foreignKey: 'cliente', as: 'multas' });
+PropuestaVenta.belongsTo(Cliente, { foreignKey: 'vendedor', as: 'vendedorRel' });
+PropuestaVenta.belongsTo(Producto, { foreignKey: 'producto', as: 'productoRel' });
+PropuestaVenta.belongsTo(MedioPago, { foreignKey: 'medio_pago', as: 'medioRel' });
 
 module.exports = {
   sequelize,
   Pais, Persona, Empleado, Sector, Seguro, Cliente, Duenio, Subastador,
   Subasta, Producto, Foto, Catalogo, ItemCatalogo, Asistente, Pujo, RegistroDeSubasta,
-  Cuenta, MedioPago, Multa, ClasificacionProducto,
+  Cuenta, MedioPago, Multa, ClasificacionProducto, PropuestaVenta,
 };

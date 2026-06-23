@@ -2,7 +2,7 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const {
   sequelize, Pais, Empleado, Sector, Persona, Cuenta, Cliente, Duenio, Subastador,
-  Seguro, Subasta, Producto, Foto, Catalogo, ItemCatalogo, ClasificacionProducto,
+  Seguro, Subasta, Producto, Foto, Catalogo, ItemCatalogo, ClasificacionProducto, MedioPago,
 } = require('../models');
 
 /**
@@ -49,8 +49,18 @@ async function seed() {
     return p.identificador;
   }
   const facundo = await crearCliente('Facundo Pérez', '30111111', 'facundo@ejemplo.com', 'plata');
-  await crearCliente('Lucía Gómez', '30222222', 'oro@ejemplo.com', 'oro');
+  const lucia = await crearCliente('Lucía Gómez', '30222222', 'oro@ejemplo.com', 'oro');
   await crearCliente('Nuevo Usuario', '30333333', 'nuevo@ejemplo.com', 'comun');
+
+  /* ---------------------- Medios de pago (billetera) ------------------ */
+  await MedioPago.bulkCreate([
+    { cliente: facundo, tipo: 'TARJETA', entidad: 'Visa', numeroIdentificador: '**** 6467', marca: 'VISA', titular: 'Facundo Pérez', vencimiento: '08/30', moneda: 'ARS', saldoDisponible: 500000, estadoVerificacion: 'Verificado' },
+    // Cheque con saldo bajo: sirve para probar el flujo de multa al pagar.
+    { cliente: facundo, tipo: 'CHEQUE', entidad: 'Banco Nación', numeroCheque: '0001', numeroIdentificador: 'CH-0001', banco: 'Banco Nación', montoCertificado: 20000, saldoDisponible: 20000, moneda: 'ARS', estadoVerificacion: 'Verificado' },
+    // Cuenta corriente: habilita el flujo de vendedor (proponer un bien).
+    { cliente: facundo, tipo: 'CUENTA', entidad: 'Citibank', numeroIdentificador: 'AR-CTA-0001', moneda: 'ARS', saldoDisponible: 300000, estadoVerificacion: 'Verificado' },
+    { cliente: lucia, tipo: 'TARJETA', entidad: 'Mastercard', numeroIdentificador: '**** 1234', marca: 'MASTERCARD', titular: 'Lucía Gómez', vencimiento: '05/29', moneda: 'ARS', saldoDisponible: 800000, estadoVerificacion: 'Verificado' },
+  ]);
 
   /* ----------------------------- Seguros ------------------------------ */
   await Seguro.create({ nroPoliza: 'POL-0001', compania: 'Seguros Patria S.A.', polizaCombinada: 'no', importe: 50000 });
