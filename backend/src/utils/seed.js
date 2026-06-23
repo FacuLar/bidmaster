@@ -115,6 +115,24 @@ async function seed() {
       historia: 'Construida por un luthier reconocido de la escena folclórica.',
       imagenes: fotos('classical,guitar'), subasta_id: subastaArs.id, dueno_id: facundo.id,
     },
+    {
+      nro_pieza: 109, categoria: 'arte', tags: ['Vintage','Colección','Impecable'], uso: 'usado', titulo: 'Vajilla de Porcelana (PAQUETE · 32 piezas)',
+      descripcion: 'Lote de 32 piezas de porcelana: platos, tazas, fuentes y bandejas.', precio_base: 52000,
+      historia: 'Servicio completo de una casa señorial, sin faltantes.',
+      imagenes: fotos('porcelain,tableware'), subasta_id: subastaArs.id, dueno_id: oro.id,
+    },
+    {
+      nro_pieza: 110, categoria: 'hobbies', tags: ['Vintage','Colección'], uso: 'usado', titulo: 'Lote de Vinilos de Jazz (PAQUETE · 40 discos)',
+      descripcion: 'Colección de 40 discos de vinilo de jazz, décadas del 50 al 70.', precio_base: 34000,
+      historia: 'Incluye ediciones originales de sellos reconocidos.',
+      imagenes: fotos('vinyl,records'), subasta_id: subastaArs.id, dueno_id: facundo.id,
+    },
+    {
+      nro_pieza: 111, categoria: 'tecnologia', tags: ['Fotografía','Vintage','Impecable'], uso: 'usado', titulo: 'Cámara Réflex Nikon',
+      descripcion: 'Cámara réflex Nikon a película, con lente 50mm.', precio_base: 28000,
+      fecha_obra: '1985', historia: 'Mantenida por un fotógrafo profesional.',
+      imagenes: fotos('nikon,camera'), subasta_id: subastaArs.id, dueno_id: facundo.id,
+    },
   ]);
 
   /* ------------------------ Subasta en dólares (plata) ---------------- */
@@ -151,6 +169,23 @@ async function seed() {
       artista: 'Montblanc', imagenes: fotos('fountain,pen'),
       subasta_id: subastaUsd.id, dueno_id: facundo.id,
     },
+    {
+      nro_pieza: 406, categoria: 'joyas', tags: ['Lujo','Vintage','Colección'], uso: 'usado', titulo: 'Set de Relojes de Bolsillo (PAQUETE · 3 piezas)',
+      descripcion: 'Tres relojes de bolsillo de plata y oro, con sus cadenas.', precio_base: 4500,
+      historia: 'Procedentes de una relojería suiza centenaria.',
+      imagenes: fotos('pocket,watch'), subasta_id: subastaUsd.id, dueno_id: oro.id,
+    },
+    {
+      nro_pieza: 407, categoria: 'joyas', tags: ['Lujo','Exclusivo','Raro'], uso: 'nuevo', titulo: 'Anillo de Diamantes',
+      descripcion: 'Anillo de oro blanco 18k con diamante central de 1.2 ct.', precio_base: 9000,
+      historia: 'Certificado gemológico GIA incluido.',
+      imagenes: fotos('diamond,ring'), subasta_id: subastaUsd.id, dueno_id: oro.id,
+    },
+    {
+      nro_pieza: 408, categoria: 'moda', tags: ['Lujo','Edición Especial'], uso: 'nuevo', titulo: 'Gemelos de Oro (PAQUETE · par + estuche)',
+      descripcion: 'Par de gemelos de oro 18k con su estuche de cuero original.', precio_base: 2200,
+      imagenes: fotos('cufflinks,gold'), subasta_id: subastaUsd.id, dueno_id: facundo.id,
+    },
   ]);
 
   /* ------------------- Subasta premium (oro) -------------------------- */
@@ -180,6 +215,67 @@ async function seed() {
       descripcion: 'Primera edición de una obra cumbre, firmada por el autor.', precio_base: 850000,
       fecha_obra: '1944', historia: 'Ejemplar numerado de una tirada limitada.',
       imagenes: fotos('antique,book'), subasta_id: subastaOro.id, dueno_id: facundo.id,
+    },
+    {
+      nro_pieza: 204, categoria: 'arte', tags: ['Arte','Colección','Limitado'], uso: 'usado', titulo: 'Colección de Grabados (PAQUETE · 6 obras)',
+      descripcion: 'Seis grabados originales numerados y firmados, enmarcados.', precio_base: 700000,
+      artista: 'A. Berni', fecha_obra: '1960',
+      historia: 'Serie completa proveniente de una colección privada.',
+      imagenes: fotos('engraving,art'), subasta_id: subastaOro.id, dueno_id: facundo.id,
+    },
+    {
+      nro_pieza: 205, categoria: 'joyas', tags: ['Lujo','Exclusivo','Garantía Oficial'], uso: 'poco_uso', titulo: 'Reloj de Lujo Suizo',
+      descripcion: 'Reloj suizo de alta gama, caja de oro y movimiento automático.', precio_base: 1800000,
+      artista: 'Patek Philippe', fecha_obra: '2005',
+      historia: 'Con caja, papeles y certificado de autenticidad.',
+      imagenes: fotos('luxury,watch'), subasta_id: subastaOro.id, dueno_id: facundo.id,
+    },
+  ]);
+
+  /* ------------- Subasta abierta (común) — accesible para todos -------- */
+  const subastaComun = await Subasta.create({
+    titulo: 'Tecnología y Coleccionables — Abierta', fecha: '2026-05-18', hora: '19:30',
+    moneda: 'ARS', categoria_requerida: 'comun', rematador: 'S. Ramírez',
+    ubicacion: 'Salón Norte', url_stream: 'wss://stream.bidmaster.com/107',
+    estado: 'programada',
+  });
+  await Pieza.bulkCreate([
+    {
+      nro_pieza: 301, categoria: 'tecnologia', tags: ['Consolas','Edición Especial'], uso: 'sellado', titulo: 'Consola PlayStation 5 (sellada)',
+      descripcion: 'PlayStation 5 nueva, en su caja sellada de fábrica.', precio_base: 90000,
+      imagenes: fotos('playstation,console'), subasta_id: subastaComun.id, dueno_id: oro.id,
+    },
+    {
+      nro_pieza: 302, categoria: 'tecnologia', tags: ['Consolas','Vintage','Colección'], uso: 'usado', titulo: 'Lote de Juegos Retro (PAQUETE · 15 cartuchos)',
+      descripcion: 'Quince cartuchos de consolas clásicas, todos funcionando.', precio_base: 40000,
+      historia: 'Colección armada durante dos décadas.',
+      imagenes: fotos('videogame,cartridge'), subasta_id: subastaComun.id, dueno_id: facundo.id,
+    },
+    {
+      nro_pieza: 303, categoria: 'tecnologia', tags: ['Consolas','Garantía Oficial'], uso: 'poco_uso', titulo: 'Nintendo Switch',
+      descripcion: 'Nintendo Switch con dos joy-cons y dock original.', precio_base: 55000,
+      imagenes: fotos('nintendo,switch'), subasta_id: subastaComun.id, dueno_id: oro.id,
+    },
+    {
+      nro_pieza: 304, categoria: 'tecnologia', tags: ['Fotografía','Lujo','Impecable'], uso: 'usado', titulo: 'Lente Leica',
+      descripcion: 'Objetivo Leica de 35mm, óptica impecable.', precio_base: 120000,
+      imagenes: fotos('leica,lens'), subasta_id: subastaComun.id, dueno_id: facundo.id,
+    },
+    {
+      nro_pieza: 305, categoria: 'moda', tags: ['Deportes','Exclusivo','Raro'], uso: 'usado', titulo: 'Camiseta de Fútbol Firmada',
+      descripcion: 'Camiseta oficial firmada por el plantel campeón.', precio_base: 65000,
+      historia: 'Con certificado de autenticidad de la firma.',
+      imagenes: fotos('soccer,jersey'), subasta_id: subastaComun.id, dueno_id: facundo.id,
+    },
+    {
+      nro_pieza: 306, categoria: 'hobbies', tags: ['Colección','Edición Especial'], uso: 'nuevo', titulo: 'Set de Figuras Coleccionables (PAQUETE · 10 figuras)',
+      descripcion: 'Diez figuras a escala de edición limitada, en caja.', precio_base: 30000,
+      imagenes: fotos('action,figures'), subasta_id: subastaComun.id, dueno_id: oro.id,
+    },
+    {
+      nro_pieza: 307, categoria: 'vehiculos', tags: ['Exclusivo','Impecable'], uso: 'poco_uso', titulo: 'Bicicleta de Alta Gama',
+      descripcion: 'Bicicleta de ruta de fibra de carbono, grupo profesional.', precio_base: 150000,
+      imagenes: fotos('road,bicycle'), subasta_id: subastaComun.id, dueno_id: facundo.id,
     },
   ]);
 
