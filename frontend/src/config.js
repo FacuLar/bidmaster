@@ -11,7 +11,7 @@ import { NativeModules } from 'react-native';
  * - Si no se puede detectar (o se usa `--tunnel`), cae a IP_FIJA: editá esa línea
  *   con la IP LAN de tu PC, o con la URL pública del backend si lo desplegás.
  */
-const IP_FIJA = '192.168.0.15'; // fallback (cambiá por tu IP o URL pública si hace falta)
+const IP_FIJA = '10.145.215.163'; // fallback (cambiá por tu IP o URL pública si hace falta)
 
 function hostDelBundle() {
   try {
